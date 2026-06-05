@@ -1,26 +1,37 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from '@/lib/AuthContext';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { Login } from '@/pages/Login';
-import { Home } from '@/pages/Home';
+import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Landing from './pages/Landing';
+import Dashboard from './pages/Dashboard';
 
 function App() {
+  const [signedIn, setSignedIn] = useState(false);
+
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Home />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            signedIn ? (
+              <Navigate to="/garden" replace />
+            ) : (
+              <Landing onStart={() => setSignedIn(true)} />
+            )
+          }
+        />
+        <Route
+          path="/garden"
+          element={
+            signedIn ? (
+              <Dashboard onSignOut={() => setSignedIn(false)} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
