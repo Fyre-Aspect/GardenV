@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Leaf } from 'lucide-react';
 import Dashboard from '@/components/dashboard';
 import { useAuth } from '@/components/auth-provider';
+import { PlantLoader } from '@/components/garden/plant-loader';
 
 export default function GardenPage() {
   const { signedIn, ready, signOut } = useAuth();
@@ -29,7 +29,7 @@ export default function GardenPage() {
         role="status"
         aria-label="Loading your garden"
       >
-        <Leaf className="h-10 w-10 animate-float text-primary/70" />
+        <PlantLoader label="Loading your garden" />
       </div>
     );
   }

@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { Leaf } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PlantLoader } from '@/components/garden/plant-loader';
 
 interface LandingProps {
   onStart: () => void;
@@ -22,7 +23,7 @@ function SceneLoader() {
       role="status"
       aria-label="Loading"
     >
-      <Leaf className="h-10 w-10 animate-pulse text-primary/70" />
+      <PlantLoader label="Growing your garden" />
     </div>
   );
 }

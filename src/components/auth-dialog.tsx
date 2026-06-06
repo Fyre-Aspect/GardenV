@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { FirebaseError } from 'firebase/app';
-import { Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/components/auth-provider';
+import { PlantLoader } from '@/components/garden/plant-loader';
 
 type Mode = 'signin' | 'signup';
 
@@ -105,6 +105,22 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       }}
     >
       <DialogContent>
+        {busy ? (
+          <>
+            <DialogHeader className="items-center text-center">
+              <DialogTitle>
+                {mode === 'signup' ? 'Planting your garden' : 'Waking your garden'}
+              </DialogTitle>
+              <DialogDescription>
+                Just a moment while we get everything growing.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-center py-6">
+              <PlantLoader />
+            </div>
+          </>
+        ) : (
+          <>
         <DialogHeader>
           <DialogTitle>
             {mode === 'signin' ? 'Welcome back' : 'Create your garden'}
@@ -123,11 +139,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           disabled={busy}
           onClick={() => run(signInWithGoogle, 'google')}
         >
-          {pending === 'google' ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <GoogleGlyph />
-          )}
+          <GoogleGlyph />
           Continue with Google
         </Button>
 
@@ -173,7 +185,6 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           )}
 
           <Button type="submit" className="w-full" disabled={busy}>
-            {pending === 'email' && <Loader2 className="h-4 w-4 animate-spin" />}
             {mode === 'signin' ? 'Sign in' : 'Create account'}
           </Button>
         </form>
@@ -192,6 +203,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             {mode === 'signin' ? 'Sign up' : 'Sign in'}
           </button>
         </p>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
