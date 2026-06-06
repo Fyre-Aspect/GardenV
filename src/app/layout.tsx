@@ -12,16 +12,16 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: 'GardenKeeper — Grow smarter, not harder',
+  title: 'Garden V — Care for your plants, every day',
   description:
-    'The AI garden companion that makes caring for your real plants as addictive as leveling up.',
+    'Garden V helps you remember what each plant needs and turns daily care into a habit worth keeping.',
   manifest: '/manifest.json',
-  applicationName: 'GardenKeeper',
+  applicationName: 'Garden V',
   icons: { apple: '/logo192.png' },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'GardenKeeper',
+    title: 'Garden V',
   },
   formatDetection: { telephone: false },
 };

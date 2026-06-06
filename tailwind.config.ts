@@ -15,7 +15,7 @@ const config: Config = {
     },
     extend: {
       colors: {
-        // GardenKeeper brand
+        // Garden V brand
         garden: {
           DEFAULT: '#2d5a27',
           light: '#3d7a35',

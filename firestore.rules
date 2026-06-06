@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// GardenKeeper security rules.
+// Garden V security rules.
 //
 // Each user owns exactly one garden document at `gardens/{uid}` holding their
 // plants, tasks, and XP (see `src/components/garden-provider.tsx`). Only the

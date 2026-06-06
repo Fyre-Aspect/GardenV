@@ -76,7 +76,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
             <Leaf className="h-5 w-5 text-primary" />
-            <span className="font-black tracking-tight text-foreground">GardenKeeper</span>
+            <span className="font-black tracking-tight text-foreground">Garden V</span>
           </div>
           <div className="flex items-center gap-4">
             <div
