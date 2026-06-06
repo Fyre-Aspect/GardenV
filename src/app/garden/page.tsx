@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Leaf } from 'lucide-react';
 import Dashboard from '@/components/dashboard';
 import { useAuth } from '@/components/auth-provider';
 
@@ -23,10 +24,12 @@ export default function GardenPage() {
 
   if (!ready || !signedIn) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-cream">
-        <span className="animate-float text-5xl" role="status" aria-label="Loading">
-          🪴
-        </span>
+      <div
+        className="flex min-h-screen items-center justify-center bg-background"
+        role="status"
+        aria-label="Loading your garden"
+      >
+        <Leaf className="h-10 w-10 animate-float text-primary/70" />
       </div>
     );
   }

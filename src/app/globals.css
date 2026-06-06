@@ -4,36 +4,42 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    /* Warm-neutral canvas */
+    --background: 40 30% 98%;
+    --foreground: 150 14% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 150 14% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 150 14% 14%;
 
     /* GardenKeeper green = #2d5a27 */
     --primary: 113 40% 25%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 140 20% 96%;
+    --secondary-foreground: 150 14% 18%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 140 16% 96%;
+    --muted-foreground: 150 8% 42%;
 
-    --accent: 138 45% 94%;
-    --accent-foreground: 113 40% 20%;
+    --accent: 138 35% 95%;
+    --accent-foreground: 113 40% 22%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 8 62% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 113 40% 25%;
+    /* A single warm "reward" accent used for XP / streak — replaces the rainbow */
+    --reward: 32 80% 52%;
+    --reward-foreground: 28 60% 22%;
+    --reward-soft: 38 70% 95%;
 
-    --radius: 1rem;
+    --border: 140 14% 90%;
+    --input: 140 14% 88%;
+    --ring: 113 40% 30%;
+
+    --radius: 0.9rem;
   }
 }
 
@@ -50,5 +56,19 @@
   body {
     @apply bg-background text-foreground antialiased;
     overflow-x: hidden;
+    font-feature-settings: 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Respect reduced-motion at the platform level as a safety net. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

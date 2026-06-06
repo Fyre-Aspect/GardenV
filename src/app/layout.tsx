@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Nunito } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/auth-provider';
+import { GardenProvider } from '@/components/garden-provider';
 
 const nunito = Nunito({
   subsets: ['latin'],
@@ -32,7 +33,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={nunito.variable}>
       <body className="font-sans">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <GardenProvider>{children}</GardenProvider>
+        </AuthProvider>
       </body>
     </html>
   );

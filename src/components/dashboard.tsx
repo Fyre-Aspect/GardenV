@@ -1,317 +1,213 @@
 'use client';
 
-import { useState } from 'react';
-import { AnimatePresence, motion, type Variants } from 'framer-motion';
-import { Plus, Search } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Flame, Leaf, Plus, ScanLine, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useGarden } from '@/components/garden-provider';
+import { SectionHeader } from '@/components/garden/section-header';
+import { StreakDots } from '@/components/garden/streak-dots';
+import { ProgressBar } from '@/components/garden/progress-bar';
+import { PlantCard } from '@/components/garden/plant-card';
+import { TaskCard } from '@/components/garden/task-card';
+import { Toast, type ToastState } from '@/components/garden/toast';
+import { AddPlantDialog } from '@/components/garden/add-plant-dialog';
+import { ScanDialog } from '@/components/garden/scan-dialog';
+import { PlantDetailDialog } from '@/components/garden/plant-detail-dialog';
+import { LevelUpCelebration } from '@/components/garden/level-up-celebration';
+import type { PlantVM } from '@/lib/data';
 
 interface DashboardProps {
   onSignOut: () => void;
 }
 
-interface Task {
-  id: number;
-  plant: string;
-  type: string;
-  emoji: string;
-  done: boolean;
-  xp: number;
-}
-
-const PLANTS = [
-  {
-    id: 1,
-    name: 'Klaus',
-    species: 'Monstera deliciosa',
-    emoji: '🌿',
-    level: 8,
-    status: 'Needs water',
-    statusClass: 'text-blue-600 bg-blue-50',
-  },
-  {
-    id: 2,
-    name: 'Sandy',
-    species: 'Cactus mix',
-    emoji: '🌵',
-    level: 3,
-    status: 'Healthy',
-    statusClass: 'text-green-600 bg-green-50',
-  },
-  {
-    id: 3,
-    name: 'Lila',
-    species: 'Peace Lily',
-    emoji: '🌸',
-    level: 5,
-    status: 'Needs fertilizer',
-    statusClass: 'text-orange-600 bg-orange-50',
-  },
-  {
-    id: 4,
-    name: 'Frank',
-    species: 'Fiddle Leaf Fig',
-    emoji: '🍃',
-    level: 6,
-    status: 'Needs light',
-    statusClass: 'text-yellow-700 bg-yellow-50',
-  },
-];
-
-const INITIAL_TASKS: Task[] = [
-  { id: 1, plant: 'Klaus', type: 'Water', emoji: '💧', done: false, xp: 10 },
-  { id: 2, plant: 'Lila', type: 'Fertilize', emoji: '🌿', done: false, xp: 20 },
-  { id: 3, plant: 'Frank', type: 'Rotate toward light', emoji: '☀️', done: false, xp: 5 },
-];
-
-const STREAK = 7;
-const XP_TO_NEXT = 300;
-const LEVEL = 4;
-// How many of the 7 weekday dots to fill. The all-time STREAK can exceed a
-// week, so the dot row is driven by a value clamped to the 7-day window.
-const DAYS_DONE_THIS_WEEK = Math.min(STREAK, 7);
-
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
-};
-
 export default function Dashboard({ onSignOut }: DashboardProps) {
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-  const [xp, setXp] = useState(240);
-  const [xpPop, setXpPop] = useState<string | null>(null);
+  const {
+    plants,
+    tasks,
+    streak,
+    progress,
+    completeTask,
+    undoTask,
+  } = useGarden();
 
-  function completeTask(id: number, earnedXp: number) {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, done: true } : t)));
-    setXp((prev) => prev + earnedXp);
-    setXpPop(`+${earnedXp} XP! ⚡`);
-    setTimeout(() => setXpPop(null), 1800);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [selectedPlant, setSelectedPlant] = useState<PlantVM | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  function showToast(message: string, action?: { label: string; fn: () => void }) {
+    window.clearTimeout(toastTimer.current);
+    setToast({ id: Date.now(), message, actionLabel: action?.label, onAction: action?.fn });
+    toastTimer.current = window.setTimeout(() => setToast(null), action ? 4000 : 2200);
   }
 
-  const completedCount = tasks.filter((t) => t.done).length;
-  const allDone = completedCount === tasks.length;
-  const xpPct = Math.min((xp / XP_TO_NEXT) * 100, 100);
+  function handleComplete(taskId: string, xp: number) {
+    completeTask(taskId);
+    showToast(`+${xp} XP`, { label: 'Undo', fn: () => undoTask(taskId) });
+  }
+
+  function openPlant(plant: PlantVM) {
+    setSelectedPlant(plant);
+    setDetailOpen(true);
+  }
+
+  const remaining = tasks.filter((t) => !t.done).length;
+  const allDone = remaining === 0;
+  const xpPct = (progress.xpIntoLevel / progress.xpForNext) * 100;
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-cream font-sans">
-      {/* ── XP POP TOAST ── */}
-      <AnimatePresence>
-        {xpPop && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.6 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.8 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-            className="pointer-events-none fixed inset-x-0 top-20 z-50 flex justify-center"
-          >
-            <div className="rounded-full bg-yellow-400 px-5 py-2 text-sm font-black text-yellow-900 shadow-lg">
-              {xpPop}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="min-h-screen overflow-x-hidden bg-background font-sans">
+      <Toast
+        toast={toast}
+        onAction={() => {
+          toast?.onAction?.();
+          setToast(null);
+        }}
+      />
+      <LevelUpCelebration />
 
       {/* ── HEADER ── */}
-      <header className="sticky top-0 z-10 border-b border-gray-100 bg-white">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🌿</span>
-            <span className="text-lg font-black text-garden">GardenKeeper</span>
+            <Leaf className="h-5 w-5 text-primary" />
+            <span className="font-black tracking-tight text-foreground">GardenKeeper</span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 font-bold text-orange-500">
-              <span className="text-lg">🔥</span>
-              <span>{STREAK}</span>
+            <div
+              className="flex items-center gap-1.5 text-sm font-bold text-reward-foreground"
+              aria-label={`${streak} day streak`}
+            >
+              <Flame className="h-4 w-4 text-reward" aria-hidden />
+              <span aria-hidden>{streak}</span>
             </div>
             <motion.div
-              key={xp}
+              key={progress.xpIntoLevel}
               initial={{ scale: 1 }}
-              animate={{ scale: [1, 1.25, 1] }}
+              animate={{ scale: [1, 1.18, 1] }}
               transition={{ duration: 0.4 }}
-              className="flex items-center gap-1.5 font-bold text-yellow-600"
+              className="flex items-center gap-1.5 text-sm font-bold text-foreground"
+              aria-label={`${progress.xpIntoLevel} XP toward level ${progress.level + 1}`}
             >
-              <span className="text-lg">⚡</span>
-              <span>{xp} XP</span>
+              <Zap className="h-4 w-4 text-reward" aria-hidden />
+              <span aria-hidden>{progress.xpIntoLevel} XP</span>
             </motion.div>
             <button
               onClick={onSignOut}
-              className="text-xs text-gray-400 transition-colors hover:text-gray-600"
+              className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               Sign out
             </button>
           </div>
         </div>
-        {/* XP progress bar */}
-        <div className="h-1.5 bg-gray-100">
-          <motion.div
-            className="h-1.5 bg-gradient-to-r from-yellow-400 to-amber-400"
-            animate={{ width: `${xpPct}%` }}
-            transition={{ duration: 0.7, ease: 'easeOut' }}
-          />
-        </div>
+        <ProgressBar value={xpPct} className="rounded-none" trackClassName="h-1 rounded-none bg-secondary" />
       </header>
 
       <main className="mx-auto max-w-4xl px-6 pb-28 pt-8">
-        {/* ── WELCOME CARD ── */}
-        <motion.div variants={fadeUp} initial="hidden" animate="show">
-          <Card className="mb-6 border-2 border-green-100 p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="mb-1 text-2xl font-black text-gray-900">
-                  Good morning, Gardener! 🌞
-                </h1>
-                <p className="text-gray-500">
-                  {allDone ? (
-                    "All done! You're crushing it today 🏆"
-                  ) : (
-                    <>
-                      You have{' '}
-                      <strong className="text-garden">
-                        {tasks.length - completedCount} tasks
-                      </strong>{' '}
-                      today. Keep that streak alive!
-                    </>
-                  )}
-                </p>
-              </div>
-              <div className="flex-shrink-0 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-2 text-center">
-                <div className="text-2xl">🔥</div>
-                <div className="text-xl font-black leading-none text-orange-500">
-                  {STREAK}
-                </div>
-                <div className="text-xs font-medium text-orange-400">days</div>
-              </div>
+        {/* ── WELCOME ── */}
+        <Card className="mb-6 border-border p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-foreground">
+                Good morning, Gardener
+              </h1>
+              <p className="mt-1 text-muted-foreground">
+                {allDone
+                  ? "All done for today. Nicely kept."
+                  : `You have ${remaining} ${remaining === 1 ? 'task' : 'tasks'} today. Keep the streak alive.`}
+              </p>
             </div>
-            {/* Weekly streak dots */}
-            <div className="mt-4 flex gap-1.5">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
-                <div key={`day-${i}`} className="flex flex-1 flex-col items-center gap-1">
-                  <div
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                      i < DAYS_DONE_THIS_WEEK
-                        ? 'bg-orange-400 text-white'
-                        : 'bg-gray-100 text-gray-300'
-                    }`}
-                  >
-                    {i < DAYS_DONE_THIS_WEEK ? '✓' : '·'}
-                  </div>
-                  <span className="text-xs text-gray-400">{day}</span>
-                </div>
-              ))}
+            <div className="flex shrink-0 flex-col items-center rounded-2xl border border-border bg-reward-soft/60 px-4 py-2.5">
+              <Flame className="h-5 w-5 text-reward" />
+              <div className="text-lg font-black leading-none text-reward-foreground">
+                {streak}
+              </div>
+              <div className="text-xs font-medium text-reward-foreground/70">days</div>
             </div>
-          </Card>
-        </motion.div>
+          </div>
+          <StreakDots filled={Math.min(streak, 7)} className="mt-5" />
+        </Card>
 
-        {/* ── LEVEL BADGE ── */}
-        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-50 p-4">
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-yellow-400 text-lg font-black text-white shadow-sm">
-            {LEVEL}
+        {/* ── LEVEL ── */}
+        <Card className="mb-8 flex items-center gap-4 border-border bg-secondary/40 p-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">
+            {progress.level}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-sm font-black text-gray-900">Level {LEVEL} — Green Thumb</span>
-              <span className="text-xs text-gray-400">
-                {xp}/{XP_TO_NEXT} XP
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-sm font-black text-foreground">
+                Level {progress.level} — Green Thumb
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {progress.xpIntoLevel}/{progress.xpForNext} XP
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-yellow-100">
-              <motion.div
-                className="h-2 rounded-full bg-gradient-to-r from-yellow-400 to-amber-400"
-                animate={{ width: `${xpPct}%` }}
-                transition={{ duration: 0.7, ease: 'easeOut' }}
-              />
-            </div>
+            <ProgressBar value={xpPct} />
           </div>
-          <span className="flex-shrink-0 text-2xl">⚡</span>
-        </div>
+        </Card>
 
-        {/* ── TODAY'S TASKS ── */}
-        <section className="mb-8">
-          <h2 className="mb-4 text-xl font-black text-gray-900">Today&apos;s Care Tasks</h2>
+        {/* ── TASKS ── */}
+        <section className="mb-10">
+          <SectionHeader title="Today's care" />
           <div className="space-y-3">
             {tasks.map((task) => (
-              <motion.div
+              <TaskCard
                 key={task.id}
-                layout
-                className={`flex items-center gap-4 rounded-2xl border-2 bg-white p-4 transition-colors ${
-                  task.done
-                    ? 'border-green-200 opacity-60'
-                    : 'border-gray-100 shadow-sm hover:border-green-200'
-                }`}
-              >
-                <div
-                  className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl text-2xl ${
-                    task.done ? 'bg-green-50' : 'bg-gray-50'
-                  }`}
-                >
-                  {task.done ? '✅' : task.emoji}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-black text-gray-900">
-                    {task.type} {task.plant}
-                  </div>
-                  <div className="text-sm text-gray-400">+{task.xp} XP on completion</div>
-                </div>
-                {task.done ? (
-                  <span className="flex-shrink-0 text-sm font-bold text-green-500">
-                    +{task.xp} XP ✓
-                  </span>
-                ) : (
-                  <Button size="sm" onClick={() => completeTask(task.id, task.xp)}>
-                    Done
-                  </Button>
-                )}
-              </motion.div>
+                task={task}
+                onComplete={() => handleComplete(task.id, task.xp)}
+              />
             ))}
           </div>
         </section>
 
-        {/* ── MY GARDEN ── */}
+        {/* ── GARDEN ── */}
         <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-black text-gray-900">My Garden</h2>
-            <Button variant="secondary" size="sm" className="bg-green-50 text-garden hover:bg-green-100">
-              <Plus className="h-4 w-4" /> Add Plant
+          <SectionHeader title="My garden">
+            <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4" /> Add plant
             </Button>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            {PLANTS.map((plant) => (
-              <motion.div
-                key={plant.id}
-                whileHover={{ y: -4 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              >
-                <Card className="group cursor-pointer border-2 border-gray-100 p-5 transition-colors hover:border-green-200 hover:shadow-md">
-                  <div className="mb-3 flex items-start justify-between">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-green-50 to-emerald-100 text-3xl shadow-sm transition-transform group-hover:scale-110">
-                      {plant.emoji}
-                    </div>
-                    <Badge variant="level">Lv.{plant.level}</Badge>
-                  </div>
-                  <div className="mb-0.5 font-black text-gray-900">{plant.name}</div>
-                  <div className="mb-3 text-xs italic text-gray-400">{plant.species}</div>
-                  <div
-                    className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${plant.statusClass}`}
-                  >
-                    {plant.status}
-                  </div>
-                </Card>
-              </motion.div>
+          </SectionHeader>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {plants.map((plant) => (
+              <PlantCard key={plant.id} plant={plant} onClick={() => openPlant(plant)} />
             ))}
           </div>
         </section>
       </main>
 
-      {/* ── FLOATING SCAN BUTTON ── */}
+      {/* ── SCAN FAB ── */}
       <motion.button
-        whileHover={{ scale: 1.08 }}
+        whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.94 }}
-        className="fixed bottom-8 right-6 flex h-16 w-16 items-center justify-center rounded-full border-b-4 border-garden-dark bg-garden text-white shadow-2xl transition-[filter] hover:brightness-110 active:border-b-0"
+        onClick={() => setScanOpen(true)}
+        className="fixed bottom-8 right-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_8px_24px_-8px_hsl(var(--primary)/0.6)] transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         aria-label="Scan a plant"
       >
-        <Search className="h-7 w-7" />
+        <ScanLine className="h-6 w-6" />
       </motion.button>
+
+      {/* ── DIALOGS ── */}
+      <AddPlantDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onAdded={(name) => showToast(`${name} added to your garden`)}
+      />
+      <ScanDialog
+        open={scanOpen}
+        onOpenChange={setScanOpen}
+        onComplete={(xp) => showToast(`+${xp} XP from scan`)}
+      />
+      <PlantDetailDialog
+        plant={selectedPlant}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onCare={() => showToast('Care logged')}
+      />
     </div>
   );
 }

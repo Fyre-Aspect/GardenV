@@ -21,7 +21,13 @@ const config: Config = {
           light: '#3d7a35',
           dark: '#1e3d1a',
         },
-        cream: '#faf9f6',
+        cream: 'hsl(var(--background))',
+        // Single warm reward accent (XP / streak) — replaces the old rainbow.
+        reward: {
+          DEFAULT: 'hsl(var(--reward))',
+          foreground: 'hsl(var(--reward-foreground))',
+          soft: 'hsl(var(--reward-soft))',
+        },
         // shadcn/ui design tokens (driven by CSS variables in globals.css)
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
