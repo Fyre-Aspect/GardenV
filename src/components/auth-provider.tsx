@@ -2,63 +2,71 @@
 
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
 } from 'react';
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  type User,
+} from 'firebase/auth';
+import { auth, googleProvider } from '@/lib/firebase';
 
 interface AuthContextValue {
+  /** The signed-in Firebase user, or null. */
+  user: User | null;
   signedIn: boolean;
+  /** False until the initial auth state has resolved (avoids redirect flicker). */
   ready: boolean;
-  signIn: () => void;
-  signOut: () => void;
+  signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
 }
-
-const STORAGE_KEY = 'gardenkeeper.signedIn';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
- * Mock auth provider. Holds a `signedIn` flag in React state and mirrors it to
- * localStorage so a refresh on /garden doesn't bounce the user back to landing.
- * This is a stand-in for real Firebase Auth, which will replace it in Phase 2.
+ * Real Firebase Auth provider. Subscribes to `onAuthStateChanged` (which also
+ * restores the persisted session on reload) and exposes Google + email/password
+ * sign-in. Replaces the previous localStorage mock.
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [signedIn, setSignedIn] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try {
-      setSignedIn(window.localStorage.getItem(STORAGE_KEY) === 'true');
-    } catch {
-      // localStorage unavailable (e.g. private mode) — stay signed out.
-    }
-    setReady(true);
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setReady(true);
+    });
+    return unsub;
   }, []);
 
-  const signIn = useCallback(() => {
-    setSignedIn(true);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, 'true');
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const signOut = useCallback(() => {
-    setSignedIn(false);
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const value = useMemo(
-    () => ({ signedIn, ready, signIn, signOut }),
-    [signedIn, ready, signIn, signOut]
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      signedIn: !!user,
+      ready,
+      signInWithGoogle: async () => {
+        await signInWithPopup(auth, googleProvider);
+      },
+      signInWithEmail: async (email, password) => {
+        await signInWithEmailAndPassword(auth, email, password);
+      },
+      signUpWithEmail: async (email, password) => {
+        await createUserWithEmailAndPassword(auth, email, password);
+      },
+      signOut: async () => {
+        await firebaseSignOut(auth);
+      },
+    }),
+    [user, ready]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

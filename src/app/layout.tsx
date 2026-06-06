@@ -16,13 +16,24 @@ export const metadata: Metadata = {
   description:
     'The AI garden companion that makes caring for your real plants as addictive as leveling up.',
   manifest: '/manifest.json',
+  applicationName: 'GardenKeeper',
   icons: { apple: '/logo192.png' },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'GardenKeeper',
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   themeColor: '#2d5a27',
   width: 'device-width',
   initialScale: 1,
+  // Standalone PWAs should fill the display and not allow the layout to be
+  // zoomed away, while staying accessible.
+  maximumScale: 5,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({

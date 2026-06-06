@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Flame, Leaf, Plus, ScanLine, Zap } from 'lucide-react';
+import { Leaf, Plus, ScanLine, Sparkles, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useGarden } from '@/components/garden-provider';
@@ -83,7 +83,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
               className="flex items-center gap-1.5 text-sm font-bold text-reward-foreground"
               aria-label={`${streak} day streak`}
             >
-              <Flame className="h-4 w-4 text-reward" aria-hidden />
+              <Sparkles className="h-4 w-4 text-reward" aria-hidden />
               <span aria-hidden>{streak}</span>
             </div>
             <motion.div
@@ -123,7 +123,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-center rounded-2xl border border-border bg-reward-soft/60 px-4 py-2.5">
-              <Flame className="h-5 w-5 text-reward" />
+              <Sparkles className="h-5 w-5 text-reward" />
               <div className="text-lg font-black leading-none text-reward-foreground">
                 {streak}
               </div>

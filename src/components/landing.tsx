@@ -4,7 +4,6 @@ import { motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowDown,
   Camera,
-  Flame,
   Leaf,
   ScanLine,
   Sparkles,
@@ -37,7 +36,7 @@ const features: { icon: LucideIcon; title: string; desc: string }[] = [
     desc: 'Photograph a plant and get an instant diagnosis with a clear treatment plan.',
   },
   {
-    icon: Flame,
+    icon: Sparkles,
     title: 'Daily Streaks',
     desc: 'Build consistent care habits and keep your streak alive day after day.',
   },
@@ -93,7 +92,7 @@ const testimonials = [
 ];
 
 const stats: { icon: LucideIcon; value: string; label: string }[] = [
-  { icon: Flame, value: '12-day', label: 'avg streak' },
+  { icon: Sparkles, value: '12-day', label: 'avg streak' },
   { icon: Sprout, value: '50K+', label: 'plants tracked' },
   { icon: Star, value: '4.9', label: 'app rating' },
   { icon: Users, value: '30K+', label: 'gardeners' },
@@ -277,7 +276,7 @@ export default function Landing({ onStart }: LandingProps) {
         <motion.div variants={fadeUp} {...inView}>
           <Card className="flex flex-col items-center gap-8 border-border bg-reward-soft/50 p-8 md:flex-row md:p-12">
             <div className="flex shrink-0 flex-col items-center">
-              <Flame className="h-14 w-14 text-reward" strokeWidth={1.75} />
+              <Sparkles className="h-14 w-14 text-reward" strokeWidth={1.75} />
               <div className="mt-2 text-4xl font-black text-reward-foreground">
                 {SHOWCASE_STREAK}
               </div>
