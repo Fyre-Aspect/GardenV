@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Leaf, Plus, ScanLine, Sparkles, Trophy, Zap } from 'lucide-react';
+import { Leaf, Plus, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useGarden } from '@/components/garden-provider';
@@ -88,30 +88,27 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
             <button
               onClick={() => setLeaderboardOpen(true)}
               className={cn(
-                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black transition-opacity hover:opacity-80',
+                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black transition-opacity hover:opacity-80 border border-border bg-secondary/30',
                 league.badge
               )}
               aria-label={`${league.name} league — view leaderboard`}
             >
-              <Trophy className="h-3.5 w-3.5" aria-hidden />
               <span className="hidden sm:inline">{league.name}</span>
             </button>
             <div
-              className="flex items-center gap-1.5 text-sm font-bold text-reward-foreground"
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold text-reward-foreground border border-reward/20 bg-reward/10"
               aria-label={`${streak} day streak`}
             >
-              <Sparkles className="h-4 w-4 text-reward" aria-hidden />
-              <span aria-hidden>{streak}</span>
+              <span aria-hidden>{streak} d</span>
             </div>
             <motion.div
               key={progress.xpIntoLevel}
               initial={{ scale: 1 }}
               animate={{ scale: [1, 1.18, 1] }}
               transition={{ duration: 0.4 }}
-              className="flex items-center gap-1.5 text-sm font-bold text-foreground"
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold text-foreground border border-border bg-secondary/30"
               aria-label={`${progress.xpIntoLevel} XP toward level ${progress.level + 1}`}
             >
-              <Zap className="h-4 w-4 text-reward" aria-hidden />
               <span aria-hidden>{progress.xpIntoLevel} XP</span>
             </motion.div>
             <button
@@ -140,7 +137,6 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-center rounded-2xl border border-border bg-reward-soft/60 px-4 py-2.5">
-              <Sparkles className="h-5 w-5 text-reward" />
               <div className="text-lg font-black leading-none text-reward-foreground">
                 {streak}
               </div>
