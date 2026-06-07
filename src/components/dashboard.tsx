@@ -66,7 +66,8 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
     setDetailOpen(false);
     setScanTarget(plant);
     setScanOpen(true);
-  
+  }
+
   function openScanNew() {
     setScanTarget(null);
     setScanOpen(true);
