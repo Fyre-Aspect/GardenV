@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { easeOut } from '@/lib/motion';
 
 /**
- * A small "plant growing" loading animation, on-brand with the rest of Garden V.
+ * A small "plant growing" loading animation, on-brand with the rest of Kindred.
  * A sprout pushes up out of the soil, leaves unfurl, and a bud opens — then the
  * whole thing sways gently while you wait. Used as the app's loading screen
  * (sign-in, route guards, the 3D scene boot).

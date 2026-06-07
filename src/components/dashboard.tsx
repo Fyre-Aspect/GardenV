@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Leaf, Plus, ScanLine, Sparkles, Zap } from 'lucide-react';
+import { Leaf, Plus, ScanLine, Sparkles, Trophy, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useGarden } from '@/components/garden-provider';
@@ -16,6 +16,9 @@ import { AddPlantDialog } from '@/components/garden/add-plant-dialog';
 import { ScanDialog } from '@/components/garden/scan-dialog';
 import { PlantDetailDialog } from '@/components/garden/plant-detail-dialog';
 import { LevelUpCelebration } from '@/components/garden/level-up-celebration';
+import { MilestoneCelebration } from '@/components/garden/milestone-celebration';
+import { LeaderboardDialog } from '@/components/garden/leaderboard-dialog';
+import { cn } from '@/lib/utils';
 import type { PlantVM } from '@/lib/data';
 
 interface DashboardProps {
@@ -28,6 +31,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
     tasks,
     streak,
     progress,
+    league,
     completeTask,
     undoTask,
   } = useGarden();
@@ -39,6 +43,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
   const [scanOpen, setScanOpen] = useState(false);
   const [selectedPlant, setSelectedPlant] = useState<PlantVM | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   function showToast(message: string, action?: { label: string; fn: () => void }) {
     window.clearTimeout(toastTimer.current);
@@ -70,15 +75,27 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
         }}
       />
       <LevelUpCelebration />
+      <MilestoneCelebration />
 
       {/* ── HEADER ── */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
             <Leaf className="h-5 w-5 text-primary" />
-            <span className="font-black tracking-tight text-foreground">Garden V</span>
+            <span className="font-black tracking-tight text-foreground">Kindred</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <button
+              onClick={() => setLeaderboardOpen(true)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black transition-opacity hover:opacity-80',
+                league.badge
+              )}
+              aria-label={`${league.name} league — view leaderboard`}
+            >
+              <Trophy className="h-3.5 w-3.5" aria-hidden />
+              <span className="hidden sm:inline">{league.name}</span>
+            </button>
             <div
               className="flex items-center gap-1.5 text-sm font-bold text-reward-foreground"
               aria-label={`${streak} day streak`}
@@ -196,6 +213,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
         open={addOpen}
         onOpenChange={setAddOpen}
         onAdded={(name) => showToast(`${name} added to your garden`)}
+        onRequestScan={() => setScanOpen(true)}
       />
       <ScanDialog
         open={scanOpen}
@@ -208,6 +226,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
         onOpenChange={setDetailOpen}
         onCare={(message) => showToast(message)}
       />
+      <LeaderboardDialog open={leaderboardOpen} onOpenChange={setLeaderboardOpen} />
     </div>
   );
 }

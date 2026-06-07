@@ -12,16 +12,16 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: 'Garden V — Care for your plants, every day',
+  title: 'Kindred — Care for your plants, every day',
   description:
-    'Garden V helps you remember what each plant needs and turns daily care into a habit worth keeping.',
+    'Kindred helps you remember what each plant needs and turns daily care into a habit worth keeping.',
   manifest: '/manifest.json',
-  applicationName: 'Garden V',
+  applicationName: 'Kindred',
   icons: { apple: '/logo192.png' },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Garden V',
+    title: 'Kindred',
   },
   formatDetection: { telephone: false },
 };

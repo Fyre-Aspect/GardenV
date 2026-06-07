@@ -14,13 +14,14 @@ import { Button } from '@/components/ui/button';
 import { PlantAvatar } from '@/components/garden/plant-avatar';
 import { ProgressBar } from '@/components/garden/progress-bar';
 import { CARE_ICON } from '@/components/garden/icons';
-import { WateringGame, type WaterVerdict } from '@/components/garden/watering-game';
+import { CareGame, type CareVerdict } from '@/components/garden/care-game';
 import { useGarden } from '@/components/garden-provider';
 import {
   CARE_ACTIONS_BY_KIND,
   CARE_META,
   careCooldownRemaining,
   formatCooldown,
+  MINIGAME_CARE,
   STATUS_META,
   type CareType,
   type PlantVM,
@@ -53,7 +54,7 @@ export function PlantDetailDialog({
   onCare,
 }: PlantDetailDialogProps) {
   const { plants, logCare } = useGarden();
-  const [waterOpen, setWaterOpen] = useState(false);
+  const [game, setGame] = useState<CareType | null>(null);
 
   if (!plant) return null;
 
@@ -66,21 +67,23 @@ export function PlantDetailDialog({
   const isPet = kind === 'pet';
 
   function doCare(type: CareType) {
-    // Water is the skill mini-game; everything else is an instant tap.
-    if (type === 'water') {
-      setWaterOpen(true);
+    // Water and feeding are skill mini-games; anything else is an instant tap.
+    if (MINIGAME_CARE[type]) {
+      setGame(type);
       return;
     }
     logCare(live.id, type, CARE_META[type].xp);
     onCare?.(`${CARE_META[type].verb} ${live.name} · +${CARE_META[type].xp} XP`);
   }
 
-  function onWaterResult(xp: number, verdict: WaterVerdict) {
-    logCare(live.id, 'water', xp);
+  function onGameResult(xp: number, verdict: CareVerdict) {
+    if (!game) return;
+    logCare(live.id, game, xp);
+    const verb = CARE_META[game].verb;
     const msg =
       verdict === 'overflow'
-        ? `You overwatered ${live.name} — go easy next time!`
-        : `Watered ${live.name}${xp > 0 ? ` · +${xp} XP` : ''}`;
+        ? `You overdid it on ${live.name} — go easy next time!`
+        : `${verb} ${live.name}${xp > 0 ? ` · +${xp} XP` : ''}`;
     onCare?.(msg);
   }
 
@@ -164,11 +167,12 @@ export function PlantDetailDialog({
         </DialogContent>
       </Dialog>
 
-      <WateringGame
-        open={waterOpen}
-        onOpenChange={setWaterOpen}
+      <CareGame
+        open={game !== null}
+        onOpenChange={(o) => !o && setGame(null)}
         companionName={live.name}
-        onResult={onWaterResult}
+        careType={game ?? 'water'}
+        onResult={onGameResult}
       />
     </>
   );

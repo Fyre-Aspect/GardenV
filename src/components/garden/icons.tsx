@@ -1,7 +1,6 @@
 import {
   Bone,
   Droplet,
-  Heart,
   Leaf,
   PawPrint,
   Sprout,
@@ -16,7 +15,6 @@ export const CARE_ICON: Record<CareType, LucideIcon> = {
   fertilize: Sprout,
   light: Sun,
   feed: Bone,
-  play: Heart,
 };
 
 /** Icon representing a companion's kind (plant vs pet). */

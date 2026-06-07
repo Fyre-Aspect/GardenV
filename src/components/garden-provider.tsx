@@ -3,7 +3,7 @@
 import {
   createContext,
   useCallback,
-  useContext, 
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -13,12 +13,18 @@ import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import {
   CARE_META,
   CARE_TO_STATUS,
+  dayKey,
   deriveProgress,
+  isStreakMilestone,
+  leagueForXp,
+  nextStreak,
+  weekKey,
   type CareType,
   type Kind,
+  type League,
   type LightLevel,
   type PlantStatus,
-  type PlantVM,  
+  type PlantVM,
   type Progress,
   type TaskVM,
 } from '@/lib/data';
@@ -32,38 +38,6 @@ interface NewPlantInput {
   light: LightLevel;
 }
 
-interface ScanOutcome {
-  healthScore: number;
-  status: PlantStatus;
-  xp: number;
-}
-
-interface GardenContextValue {
-  plants: PlantVM[];
-  tasks: TaskVM[];
-  totalXp: number;
-  streak: number;
-  progress: Progress;
-  /** Set to the new level when a level-up just happened; cleared via `acknowledgeLevelUp`. */
-  justLeveledUp: number | null;
-  completeTask: (taskId: string) => void;
-  undoTask: (taskId: string) => void;
-  addPlant: (input: NewPlantInput) => PlantVM;
-  /** Add a plant identified by an AI scan (sets health/status/care from the scan). */
-  addScannedPlant: (input: ScannedPlantInput) => PlantVM;
-  applyScan: (plantId: string, outcome: ScanOutcome) => void;
-  /** Record a care action: marks healthy, stamps the cooldown, awards `xp`. */
-  logCare: (plantId: string, type: CareType, xp: number) => void;
-  acknowledgeLevelUp: () => void;
-}
-
-interface PersistShape {
-  totalXp: number;
-  plants: PlantVM[];
-  tasks: TaskVM[];
-}
-
-/** Everything a scan needs to add an identified plant or pet to the garden. */
 interface ScannedPlantInput {
   name: string;
   species: string;
@@ -75,72 +49,111 @@ interface ScannedPlantInput {
   fertilizingIntervalDays: number;
 }
 
+interface GardenContextValue {
+  plants: PlantVM[];
+  tasks: TaskVM[];
+  totalXp: number;
+  /** XP earned in the current week (drives the league + leaderboard). */
+  weeklyXp: number;
+  league: League;
+  streak: number;
+  progress: Progress;
+  /** Public name shown on the leaderboard. */
+  displayName: string;
+  /** Set to the new level on a level-up; cleared via `acknowledgeLevelUp`. */
+  justLeveledUp: number | null;
+  /** Set to the streak count when a milestone is hit; cleared via `acknowledgeStreak`. */
+  justHitStreak: number | null;
+  completeTask: (taskId: string) => void;
+  undoTask: (taskId: string) => void;
+  addPlant: (input: NewPlantInput) => PlantVM;
+  addScannedPlant: (input: ScannedPlantInput) => PlantVM;
+  /** Record a care action: marks healthy, stamps the cooldown, awards `xp`. */
+  logCare: (plantId: string, type: CareType, xp: number) => void;
+  acknowledgeLevelUp: () => void;
+  acknowledgeStreak: () => void;
+}
+
+interface PersistShape {
+  totalXp: number;
+  plants: PlantVM[];
+  tasks: TaskVM[];
+  streak: number;
+  lastActiveDay: string;
+  weeklyXp: number;
+  weekKey: string;
+}
+
 /**
  * Bump to force a one-time wipe of every existing garden. On load, any doc
- * whose `version` doesn't match is reset to an empty garden — so every user
- * starts from a clean slate with no demo data.
+ * whose `version` doesn't match is reset to an empty garden.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
-/** Fresh accounts (and resets) start completely empty — no plants, no XP. */
-const EMPTY_GARDEN: PersistShape = { totalXp: 0, plants: [], tasks: [] };
+const EMPTY_GARDEN: PersistShape = {
+  totalXp: 0,
+  plants: [],
+  tasks: [],
+  streak: 0,
+  lastActiveDay: '',
+  weeklyXp: 0,
+  weekKey: '',
+};
 
-/** XP awarded for scanning and cataloguing a new plant. */
+/** XP awarded for scanning and cataloguing a new companion. */
 export const SCAN_XP = 25;
 
-/** Firestore document holding one user's whole garden, at `gardens/{uid}`. */
 const gardenDoc = (uid: string) => doc(db, 'gardens', uid);
+/** Public leaderboard mirror — one doc per user, readable by all. */
+const leaderboardDoc = (uid: string) => doc(db, 'leaderboard', uid);
 
 const GardenContext = createContext<GardenContextValue | null>(null);
 
-/**
- * Garden state. Centralises all gamification logic — XP, level-up rollover,
- * task completion, scanning — and persists per-user to Firestore at
- * `gardens/{uid}`.
- *
- * Sync model: a live `onSnapshot` subscription hydrates state and keeps it
- * fresh across devices; local mutations are written back (debounced) via
- * `setDoc`. To avoid an echo loop (our own writes come back as snapshots) we
- * track the JSON of the last value we synced and only write when the current
- * state actually differs from it — value comparison, not a fragile flag.
- * Firestore's offline (IndexedDB) cache, enabled in `lib/firebase.ts`, keeps
- * this working with no network.
- */
 export function GardenProvider({ children }: { children: React.ReactNode }) {
   const { user, ready } = useAuth();
 
   const [plants, setPlants] = useState<PlantVM[]>(EMPTY_GARDEN.plants);
   const [tasks, setTasks] = useState<TaskVM[]>(EMPTY_GARDEN.tasks);
-  const [totalXp, setTotalXp] = useState<number>(EMPTY_GARDEN.totalXp);
+  const [totalXp, setTotalXp] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [lastActiveDay, setLastActiveDay] = useState('');
+  const [weeklyXp, setWeeklyXp] = useState(0);
+  const [weekKeyState, setWeekKeyState] = useState('');
   const [justLeveledUp, setJustLeveledUp] = useState<number | null>(null);
-
-  // True once the current user's doc has loaded (or been seeded). Gates writes
-  // so we never persist the default seed state over real data during load.
+  const [justHitStreak, setJustHitStreak] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
-  // JSON of the most recent value we know is in sync with Firestore (either
-  // just read from a snapshot or just written). Used to suppress redundant /
-  // echo writes without ever stranding a genuine local change.
+
   const lastSyncedRef = useRef<string | null>(null);
 
-  // Latest `tasks`, mirrored into a ref so `completeTask`/`undoTask` can read
-  // the current value without nesting side-effecting setState calls inside a
-  // `setTasks` updater. React StrictMode double-invokes updaters, so that
-  // nesting fired `changeXp` twice — awarding XP twice per tap.
+  // Refs mirror the latest state so event callbacks read fresh values without
+  // nesting side effects inside setState updaters (StrictMode double-invokes those).
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
+  const streakRef = useRef(streak);
+  streakRef.current = streak;
+  const lastActiveRef = useRef(lastActiveDay);
+  lastActiveRef.current = lastActiveDay;
+  const weekRef = useRef(weekKeyState);
+  weekRef.current = weekKeyState;
 
-  // Subscribe to the signed-in user's garden doc. Seeds a fresh doc for new
-  // users from the starter data. Re-runs whenever the account changes, so each
-  // user only ever reads and writes their own `gardens/{uid}` document.
+  const displayName = useMemo(
+    () => user?.displayName || user?.email?.split('@')[0] || 'Gardener',
+    [user]
+  );
+
+  // ── Subscribe to the user's garden doc ───────────────────────────────────
   useEffect(() => {
     if (!ready) return;
 
     if (!user) {
-      // Signed out: clear to empty so the next account doesn't see stale data.
       lastSyncedRef.current = null;
       setPlants([]);
       setTasks([]);
       setTotalXp(0);
+      setStreak(0);
+      setLastActiveDay('');
+      setWeeklyXp(0);
+      setWeekKeyState('');
       setHydrated(false);
       return;
     }
@@ -156,13 +169,15 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
           ? (snap.data() as Partial<PersistShape> & { version?: number })
           : null;
 
-        // New account, or a pre-existing garden on an old schema → start empty.
-        // (The version check is what erases everyone's old demo data once.)
         if (!data || data.version !== SCHEMA_VERSION) {
           lastSyncedRef.current = JSON.stringify(EMPTY_GARDEN);
-          setTotalXp(0);
           setPlants([]);
           setTasks([]);
+          setTotalXp(0);
+          setStreak(0);
+          setLastActiveDay('');
+          setWeeklyXp(0);
+          setWeekKeyState('');
           setDoc(ref, {
             ...EMPTY_GARDEN,
             version: SCHEMA_VERSION,
@@ -176,11 +191,19 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
           totalXp: typeof data.totalXp === 'number' ? data.totalXp : 0,
           plants: Array.isArray(data.plants) ? (data.plants as PlantVM[]) : [],
           tasks: Array.isArray(data.tasks) ? (data.tasks as TaskVM[]) : [],
+          streak: typeof data.streak === 'number' ? data.streak : 0,
+          lastActiveDay: typeof data.lastActiveDay === 'string' ? data.lastActiveDay : '',
+          weeklyXp: typeof data.weeklyXp === 'number' ? data.weeklyXp : 0,
+          weekKey: typeof data.weekKey === 'string' ? data.weekKey : '',
         };
         lastSyncedRef.current = JSON.stringify(next);
         setTotalXp(next.totalXp);
         setPlants(next.plants);
         setTasks(next.tasks);
+        setStreak(next.streak);
+        setLastActiveDay(next.lastActiveDay);
+        setWeeklyXp(next.weeklyXp);
+        setWeekKeyState(next.weekKey);
         setHydrated(true);
       },
       (err) => console.error('[garden] snapshot listener error', err)
@@ -189,12 +212,18 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, [user, ready]);
 
-  // Persist local changes back to Firestore (debounced). Only writes when the
-  // current state differs from the last value we synced, so our own snapshot
-  // echoes don't trigger redundant writes.
+  // ── Persist garden changes (debounced) ───────────────────────────────────
   useEffect(() => {
     if (!user || !hydrated) return;
-    const payload: PersistShape = { totalXp, plants, tasks };
+    const payload: PersistShape = {
+      totalXp,
+      plants,
+      tasks,
+      streak,
+      lastActiveDay,
+      weeklyXp,
+      weekKey: weekKeyState,
+    };
     const serialized = JSON.stringify(payload);
     if (serialized === lastSyncedRef.current) return;
 
@@ -205,42 +234,81 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         ref,
         { ...payload, version: SCHEMA_VERSION, updatedAt: serverTimestamp() },
         { merge: true }
-      ).catch(
-        (err) => console.error('[garden] failed to save garden', err)
-      );
+      ).catch((err) => console.error('[garden] failed to save garden', err));
     }, 600);
     return () => clearTimeout(timer);
-  }, [totalXp, plants, tasks, user, hydrated]);
+  }, [totalXp, plants, tasks, streak, lastActiveDay, weeklyXp, weekKeyState, user, hydrated]);
+
+  // Weekly XP only counts if it's still the same week; otherwise it's last
+  // week's total and the league shows as reset until new XP comes in.
+  const currentWeek = weekKey();
+  const effectiveWeeklyXp = weekKeyState === currentWeek ? weeklyXp : 0;
+  const league = useMemo(() => leagueForXp(effectiveWeeklyXp), [effectiveWeeklyXp]);
+
+  // ── Mirror to the public leaderboard (debounced) ─────────────────────────
+  useEffect(() => {
+    if (!user || !hydrated) return;
+    const timer = setTimeout(() => {
+      setDoc(
+        leaderboardDoc(user.uid),
+        {
+          name: displayName,
+          totalXp,
+          weeklyXp: effectiveWeeklyXp,
+          league: league.key,
+          week: currentWeek,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      ).catch((err) => console.error('[garden] failed to update leaderboard', err));
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [user, hydrated, displayName, totalXp, effectiveWeeklyXp, league.key, currentWeek]);
 
   const progress = useMemo(() => deriveProgress(totalXp), [totalXp]);
 
-  /** Adjust XP and flag a level-up if the level boundary was crossed upward. */
+  /** Adjust total XP (level-up detection) and roll the weekly-XP total. */
   const changeXp = useCallback((delta: number) => {
     setTotalXp((prev) => {
       const next = Math.max(0, prev + delta);
-      if (delta > 0) {
-        const before = deriveProgress(prev).level;
-        const after = deriveProgress(next).level;
-        if (after > before) setJustLeveledUp(after);
+      if (delta > 0 && deriveProgress(next).level > deriveProgress(prev).level) {
+        setJustLeveledUp(deriveProgress(next).level);
       }
       return next;
     });
+    if (delta > 0) {
+      const cur = weekKey();
+      if (weekRef.current !== cur) {
+        weekRef.current = cur;
+        setWeekKeyState(cur);
+        setWeeklyXp(delta);
+      } else {
+        setWeeklyXp((w) => w + delta);
+      }
+    }
+  }, []);
+
+  /** Count today as an active day and bump the streak (once per day). */
+  const registerActivity = useCallback(() => {
+    const today = dayKey();
+    if (lastActiveRef.current === today) return;
+    const ns = nextStreak(streakRef.current, lastActiveRef.current, today);
+    streakRef.current = ns;
+    lastActiveRef.current = today;
+    setStreak(ns);
+    setLastActiveDay(today);
+    if (isStreakMilestone(ns)) setJustHitStreak(ns);
   }, []);
 
   const setPlantStatus = useCallback((plantId: string, status: PlantStatus) => {
-    setPlants((prev) =>
-      prev.map((p) => (p.id === plantId ? { ...p, status } : p))
-    );
+    setPlants((prev) => prev.map((p) => (p.id === plantId ? { ...p, status } : p)));
   }, []);
 
   const completeTask = useCallback(
     (taskId: string) => {
       const task = tasksRef.current.find((t) => t.id === taskId);
       if (!task || task.done) return;
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, done: true } : t))
-      );
-      // Mark healthy and stamp the cooldown so the detail view reflects the care.
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: true } : t)));
       setPlants((prev) =>
         prev.map((p) =>
           p.id === task.plantId
@@ -249,17 +317,16 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         )
       );
       changeXp(task.xp);
+      registerActivity();
     },
-    [changeXp]
+    [changeXp, registerActivity]
   );
 
   const undoTask = useCallback(
     (taskId: string) => {
       const task = tasksRef.current.find((t) => t.id === taskId);
       if (!task || !task.done) return;
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, done: false } : t))
-      );
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: false } : t)));
       setPlantStatus(task.plantId, CARE_TO_STATUS[task.type]);
       changeXp(-task.xp);
     },
@@ -270,7 +337,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     const plant: PlantVM = {
       id: `p-${Date.now()}`,
       name: input.name.trim(),
-      species: input.species.trim() || (input.kind === 'pet' ? 'Unknown breed' : 'Unknown species'),
+      species:
+        input.species.trim() || (input.kind === 'pet' ? 'Unknown breed' : 'Unknown species'),
       kind: input.kind,
       level: 1,
       status: 'healthy',
@@ -284,25 +352,6 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     return plant;
   }, []);
 
-  const applyScan = useCallback(
-    (plantId: string, outcome: ScanOutcome) => {
-      setPlants((prev) =>
-        prev.map((p) =>
-          p.id === plantId
-            ? { ...p, healthScore: outcome.healthScore, status: outcome.status }
-            : p
-        )
-      );
-      changeXp(outcome.xp);
-    },
-    [changeXp]
-  );
-
-  /**
-   * Record a care action: mark the companion healthy, stamp the cooldown for
-   * that action, and award the given XP. `xp` is variable so the watering
-   * mini-game can pay out based on how well the player did.
-   */
   const logCare = useCallback(
     (plantId: string, type: CareType, xp: number) => {
       setPlants((prev) =>
@@ -313,15 +362,11 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         )
       );
       if (xp) changeXp(xp);
+      registerActivity();
     },
-    [changeXp]
+    [changeXp, registerActivity]
   );
 
-  /**
-   * Add a plant identified by an AI scan. Creates the catalogued plant, awards
-   * scan XP, and — if the scan flagged an issue — drops a matching care task
-   * into Today's care so the reminder loop starts immediately.
-   */
   const addScannedPlant = useCallback(
     (input: ScannedPlantInput): PlantVM => {
       const id = `p-${Date.now()}`;
@@ -329,8 +374,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         id,
         name: input.name.trim() || (input.kind === 'pet' ? 'New pet' : 'New plant'),
         species:
-          input.species.trim() ||
-          (input.kind === 'pet' ? 'Unknown breed' : 'Unknown species'),
+          input.species.trim() || (input.kind === 'pet' ? 'Unknown breed' : 'Unknown species'),
         kind: input.kind,
         level: 1,
         status: input.status,
@@ -358,42 +402,53 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       }
 
       changeXp(SCAN_XP);
+      registerActivity();
       return plant;
     },
-    [changeXp]
+    [changeXp, registerActivity]
   );
 
   const acknowledgeLevelUp = useCallback(() => setJustLeveledUp(null), []);
+  const acknowledgeStreak = useCallback(() => setJustHitStreak(null), []);
 
   const value = useMemo<GardenContextValue>(
     () => ({
       plants,
       tasks,
       totalXp,
-      streak: 0,
+      weeklyXp: effectiveWeeklyXp,
+      league,
+      streak,
       progress,
+      displayName,
       justLeveledUp,
+      justHitStreak,
       completeTask,
       undoTask,
       addPlant,
       addScannedPlant,
-      applyScan,
       logCare,
       acknowledgeLevelUp,
+      acknowledgeStreak,
     }),
     [
       plants,
       tasks,
       totalXp,
+      effectiveWeeklyXp,
+      league,
+      streak,
       progress,
+      displayName,
       justLeveledUp,
+      justHitStreak,
       completeTask,
       undoTask,
       addPlant,
       addScannedPlant,
-      applyScan,
       logCare,
       acknowledgeLevelUp,
+      acknowledgeStreak,
     ]
   );
 

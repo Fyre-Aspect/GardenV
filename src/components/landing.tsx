@@ -37,7 +37,7 @@ export default function Landing({ onStart }: LandingProps) {
           <div className="flex items-center gap-2 pl-1">
             <Leaf className="h-5 w-5 text-primary" />
             <span className="text-lg font-black tracking-tight text-foreground">
-              Garden V
+              Kindred
             </span>
           </div>
           <Button variant="outline" size="sm" onClick={onStart}>

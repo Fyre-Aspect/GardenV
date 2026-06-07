@@ -105,7 +105,7 @@ function SceneCopy({ onStart }: PlantSceneProps) {
       {/* ── PAGE 1 · FLOWER (the hook) ── */}
       <section className="flex h-screen w-screen items-end justify-center px-6 pb-20">
         <Panel className="text-center">
-          <div className={eyebrow}>Garden V</div>
+          <div className={eyebrow}>Kindred</div>
           <h1 className="mb-3 text-4xl font-black leading-[1.08] tracking-tight text-foreground sm:text-5xl">
             Grow something
             <br />
@@ -130,9 +130,9 @@ function SceneCopy({ onStart }: PlantSceneProps) {
             Every plant, in one calm place.
           </h2>
           <p className="leading-relaxed text-muted-foreground">
-            Add each plant you own, note its light and quirks, and let Garden V
-            hold every watering and feeding schedule for you — so nothing wilts
-            during a busy week.
+            Add every plant and pet you care for, and let Kindred hold every
+            watering, feeding and care schedule for you — so nothing slips
+            through a busy week.
           </p>
         </Panel>
       </section>
@@ -157,11 +157,11 @@ function SceneCopy({ onStart }: PlantSceneProps) {
         <Panel className="text-center">
           <div className={eyebrow}>The roots</div>
           <h2 className="mb-3 text-3xl font-black tracking-tight text-foreground">
-            Why we built Garden V
+            Why we built Kindred
           </h2>
           <p className="mx-auto mb-6 max-w-sm leading-relaxed text-muted-foreground">
             Most plants don&apos;t die from neglect — they die from being
-            forgotten. Garden V is the gentle, rewarding nudge we wished we had:
+            forgotten. Kindred is the gentle, rewarding nudge we wished we had:
             rooted in routine, growing right alongside you.
           </p>
           <Button size="lg" onClick={onStart}>
@@ -195,12 +195,12 @@ function SceneCopy({ onStart }: PlantSceneProps) {
 
 const FAQS: { q: string; a: string }[] = [
   {
-    q: 'Is Garden V free?',
+    q: 'Is Kindred free?',
     a: 'Yes — create an account and start growing at no cost.',
   },
   {
     q: 'How does the plant scan work?',
-    a: 'Snap a photo and Garden V’s AI identifies the plant, checks how healthy it looks, and adds it to your garden with tailored care tips.',
+    a: 'Snap a photo and Kindred’s AI identifies the plant or pet, checks how healthy it looks, and adds it to your garden with tailored care tips.',
   },
   {
     q: 'Do I need to install anything?',

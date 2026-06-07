@@ -15,7 +15,7 @@ const config: Config = {
     },
     extend: {
       colors: {
-        // Garden V brand
+        // Kindred brand
         garden: {
           DEFAULT: '#2d5a27',
           light: '#3d7a35',

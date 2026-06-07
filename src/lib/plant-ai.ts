@@ -1,5 +1,23 @@
 import type { Kind, LightLevel, PlantStatus } from '@/lib/data';
 
+/** Result of identifying a companion from typed text (no photo). */
+export interface TextIdentifyResult {
+  /** True when the typed text is specific enough for accurate care info. */
+  confident: boolean;
+  /** Why a photo is (or isn't) needed — shown to the user when not confident. */
+  reason: string;
+  kind: Kind;
+  commonName: string;
+  species: string;
+  status: PlantStatus;
+  healthScore: number;
+  summary: string;
+  careTips: string[];
+  light: LightLevel;
+  wateringIntervalDays: number;
+  fertilizingIntervalDays: number;
+}
+
 /**
  * Companion scanning client. The actual Gemini call happens server-side in
  * `src/app/api/scan/route.ts` (so the API key never reaches the browser); this
@@ -48,4 +66,27 @@ export async function scanPlant(
   }
 
   return (await res.json()) as PlantScanResult;
+}
+
+/**
+ * Identify a companion from typed text. Returns `confident: false` when the
+ * input is too vague (e.g. just "dog") and a photo would help.
+ */
+export async function identifyByText(
+  name: string,
+  species: string,
+  kind: Kind
+): Promise<TextIdentifyResult> {
+  const res = await fetch('/api/identify', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, species, kind }),
+  });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? `Identification failed (${res.status})`);
+  }
+
+  return (await res.json()) as TextIdentifyResult;
 }
