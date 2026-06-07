@@ -200,7 +200,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
       <ScanDialog
         open={scanOpen}
         onOpenChange={setScanOpen}
-        onComplete={(xp) => showToast(`+${xp} XP from scan`)}
+        onScanned={(info) => showToast(`${info.name} added — ${info.message} (+${info.xp} XP)`)}
       />
       <PlantDetailDialog
         plant={selectedPlant}

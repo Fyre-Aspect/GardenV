@@ -1,34 +1,52 @@
 'use client';
 
+import { useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ScrollControls, Scroll, useScroll } from '@react-three/drei';
-import { useReducedMotion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 import * as THREE from 'three';
 import { Plant } from '@/components/plant-3d';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { easeOut } from '@/lib/motion';
 
 /**
- * The scroll-driven 3D landing. Four virtual pages take the camera on a journey
- * down the plant — flower (hook) → stem (what it is / the habit) → roots (why).
+ * The scroll-driven 3D landing. Five virtual pages take the camera on a journey
+ * down the plant — flower (hook) → stem (what it is / the habit) → roots (why) —
+ * then pull back to frame the whole plant behind an interactive FAQ.
  * `ScrollControls` owns the scroll; the `<Scroll html>` layer carries the copy
  * and scrolls in lockstep with the camera.
  */
+
+const PAGES = 5;
 
 interface PlantSceneProps {
   onStart: () => void;
 }
 
-/** Drives the camera straight down the plant as the user scrolls. */
+/**
+ * Drives the camera as the user scrolls: straight down the plant
+ * (flower → roots) across the first four pages, then pulls back on the final
+ * page to frame the whole plant as a backdrop for the FAQ.
+ */
 function CameraRig() {
   const scroll = useScroll();
   useFrame((state) => {
-    const o = scroll.offset; // 0 (flower) → 1 (roots)
-    const y = THREE.MathUtils.lerp(4.15, -5.2, o);
-    // Ease out and back in a touch so the middle of the journey feels dimensional.
-    const arc = Math.sin(o * Math.PI);
-    state.camera.position.set(arc * 0.6, y, 8.6 - arc * 1.1);
-    state.camera.lookAt(0, y, 0);
+    const o = scroll.offset; // 0..1 across all pages
+    const descend = THREE.MathUtils.clamp(o / 0.8, 0, 1); // flower→roots over pages 1–4
+    const pull = THREE.MathUtils.clamp((o - 0.8) / 0.2, 0, 1); // page 5: pull back
+
+    const arc = Math.sin(descend * Math.PI); // adds a little dimensional drift
+    const journeyY = THREE.MathUtils.lerp(4.15, -5.2, descend);
+    const focusY = THREE.MathUtils.lerp(journeyY, -0.5, pull);
+
+    state.camera.position.set(
+      arc * 0.6 * (1 - pull),
+      focusY,
+      THREE.MathUtils.lerp(8.6 - arc * 1.1, 17, pull)
+    );
+    state.camera.lookAt(0, focusY, 0);
   });
   return null;
 }
@@ -47,7 +65,7 @@ export default function PlantScene({ onStart }: PlantSceneProps) {
       <directionalLight position={[5, 9, 6]} intensity={1.15} />
       <directionalLight position={[-6, 2, -3]} intensity={0.35} />
 
-      <ScrollControls pages={4} damping={0.28}>
+      <ScrollControls pages={PAGES} damping={0.28}>
         <CameraRig />
         <Plant reducedMotion={reduce} />
 
@@ -152,6 +170,88 @@ function SceneCopy({ onStart }: PlantSceneProps) {
           </Button>
         </Panel>
       </section>
+
+      {/* ── PAGE 5 · FAQ (camera pulls back to reveal the whole plant) ── */}
+      <section className="flex h-screen w-screen items-center justify-center px-6 py-16">
+        <Panel className="max-h-[82vh] w-full max-w-lg overflow-y-auto">
+          <div className={eyebrow}>FAQ</div>
+          <h2 className="mb-2 text-3xl font-black tracking-tight text-foreground">
+            Questions? Answered.
+          </h2>
+          <div className="mb-6">
+            {FAQS.map((faq) => (
+              <FaqItem key={faq.q} q={faq.q} a={faq.a} />
+            ))}
+          </div>
+          <Button size="lg" onClick={onStart} className="w-full">
+            Start your garden — it&apos;s free
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </Panel>
+      </section>
+    </div>
+  );
+}
+
+const FAQS: { q: string; a: string }[] = [
+  {
+    q: 'Is Garden V free?',
+    a: 'Yes — create an account and start growing at no cost.',
+  },
+  {
+    q: 'How does the plant scan work?',
+    a: 'Snap a photo and Garden V’s AI identifies the plant, checks how healthy it looks, and adds it to your garden with tailored care tips.',
+  },
+  {
+    q: 'Do I need to install anything?',
+    a: 'No. It runs right in your browser — and because it’s a PWA, you can add it to your home screen to use it like a native app.',
+  },
+  {
+    q: 'Does it work offline?',
+    a: 'Your garden is cached on your device, so you can check on your plants without a connection. Scanning a new plant needs internet.',
+  },
+  {
+    q: 'Is my data private?',
+    a: 'Every garden is stored privately under your own account — only you can see or change it.',
+  },
+  {
+    q: 'What if I miss a day?',
+    a: 'No guilt here. Your plants and reminders are waiting for you whenever you come back.',
+  },
+];
+
+/** A single expandable FAQ row. */
+function FaqItem({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-border/60 last:border-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-4 py-4 text-left"
+        aria-expanded={open}
+      >
+        <span className="font-bold text-foreground">{q}</span>
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 shrink-0 text-primary transition-transform duration-200',
+            open && 'rotate-180'
+          )}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: easeOut }}
+            className="overflow-hidden"
+          >
+            <p className="pb-4 text-sm leading-relaxed text-muted-foreground">{a}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
