@@ -15,6 +15,7 @@ import {
   CARE_TO_STATUS,
   deriveProgress,
   type CareType,
+  type Kind,
   type LightLevel,
   type PlantStatus,
   type PlantVM,  
@@ -27,6 +28,7 @@ import { useAuth } from '@/components/auth-provider';
 interface NewPlantInput {
   name: string;
   species: string;
+  kind: Kind;
   light: LightLevel;
 }
 
@@ -50,8 +52,8 @@ interface GardenContextValue {
   /** Add a plant identified by an AI scan (sets health/status/care from the scan). */
   addScannedPlant: (input: ScannedPlantInput) => PlantVM;
   applyScan: (plantId: string, outcome: ScanOutcome) => void;
-  /** Log an ad-hoc care action from the plant detail view: marks healthy + awards XP. */
-  carePlant: (plantId: string, type: CareType) => void;
+  /** Record a care action: marks healthy, stamps the cooldown, awards `xp`. */
+  logCare: (plantId: string, type: CareType, xp: number) => void;
   acknowledgeLevelUp: () => void;
 }
 
@@ -61,10 +63,11 @@ interface PersistShape {
   tasks: TaskVM[];
 }
 
-/** Everything a scan needs to add an identified plant to the garden. */
+/** Everything a scan needs to add an identified plant or pet to the garden. */
 interface ScannedPlantInput {
   name: string;
   species: string;
+  kind: Kind;
   status: PlantStatus;
   healthScore: number;
   light: LightLevel;
@@ -77,7 +80,7 @@ interface ScannedPlantInput {
  * whose `version` doesn't match is reset to an empty garden — so every user
  * starts from a clean slate with no demo data.
  */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /** Fresh accounts (and resets) start completely empty — no plants, no XP. */
 const EMPTY_GARDEN: PersistShape = { totalXp: 0, plants: [], tasks: [] };
@@ -237,10 +240,17 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, done: true } : t))
       );
-      setPlantStatus(task.plantId, 'healthy');
+      // Mark healthy and stamp the cooldown so the detail view reflects the care.
+      setPlants((prev) =>
+        prev.map((p) =>
+          p.id === task.plantId
+            ? { ...p, status: 'healthy', lastCare: { ...p.lastCare, [task.type]: Date.now() } }
+            : p
+        )
+      );
       changeXp(task.xp);
     },
-    [changeXp, setPlantStatus]
+    [changeXp]
   );
 
   const undoTask = useCallback(
@@ -260,13 +270,15 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     const plant: PlantVM = {
       id: `p-${Date.now()}`,
       name: input.name.trim(),
-      species: input.species.trim() || 'Unknown species',
+      species: input.species.trim() || (input.kind === 'pet' ? 'Unknown breed' : 'Unknown species'),
+      kind: input.kind,
       level: 1,
       status: 'healthy',
       healthScore: 90,
       wateringIntervalDays: 7,
-      fertilizingIntervalDays: 30,
+      fertilizingIntervalDays: input.kind === 'pet' ? 1 : 30,
       light: input.light,
+      lastCare: {},
     };
     setPlants((prev) => [...prev, plant]);
     return plant;
@@ -286,12 +298,23 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     [changeXp]
   );
 
-  const carePlant = useCallback(
-    (plantId: string, type: CareType) => {
-      setPlantStatus(plantId, 'healthy');
-      changeXp(CARE_META[type].xp);
+  /**
+   * Record a care action: mark the companion healthy, stamp the cooldown for
+   * that action, and award the given XP. `xp` is variable so the watering
+   * mini-game can pay out based on how well the player did.
+   */
+  const logCare = useCallback(
+    (plantId: string, type: CareType, xp: number) => {
+      setPlants((prev) =>
+        prev.map((p) =>
+          p.id === plantId
+            ? { ...p, status: 'healthy', lastCare: { ...p.lastCare, [type]: Date.now() } }
+            : p
+        )
+      );
+      if (xp) changeXp(xp);
     },
-    [changeXp, setPlantStatus]
+    [changeXp]
   );
 
   /**
@@ -304,14 +327,18 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       const id = `p-${Date.now()}`;
       const plant: PlantVM = {
         id,
-        name: input.name.trim() || 'New plant',
-        species: input.species.trim() || 'Unknown species',
+        name: input.name.trim() || (input.kind === 'pet' ? 'New pet' : 'New plant'),
+        species:
+          input.species.trim() ||
+          (input.kind === 'pet' ? 'Unknown breed' : 'Unknown species'),
+        kind: input.kind,
         level: 1,
         status: input.status,
         healthScore: input.healthScore,
         wateringIntervalDays: input.wateringIntervalDays,
         fertilizingIntervalDays: input.fertilizingIntervalDays,
         light: input.light,
+        lastCare: {},
       };
       setPlants((prev) => [...prev, plant]);
 
@@ -351,7 +378,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       addPlant,
       addScannedPlant,
       applyScan,
-      carePlant,
+      logCare,
       acknowledgeLevelUp,
     }),
     [
@@ -365,7 +392,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       addPlant,
       addScannedPlant,
       applyScan,
-      carePlant,
+      logCare,
       acknowledgeLevelUp,
     ]
   );

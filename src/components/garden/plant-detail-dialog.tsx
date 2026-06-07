@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { Lock } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,21 +14,26 @@ import { Button } from '@/components/ui/button';
 import { PlantAvatar } from '@/components/garden/plant-avatar';
 import { ProgressBar } from '@/components/garden/progress-bar';
 import { CARE_ICON } from '@/components/garden/icons';
+import { WateringGame, type WaterVerdict } from '@/components/garden/watering-game';
 import { useGarden } from '@/components/garden-provider';
-import { STATUS_META, type CareType, type PlantVM } from '@/lib/data';
+import {
+  CARE_ACTIONS_BY_KIND,
+  CARE_META,
+  careCooldownRemaining,
+  formatCooldown,
+  STATUS_META,
+  type CareType,
+  type PlantVM,
+} from '@/lib/data';
 import { cn } from '@/lib/utils';
 
 interface PlantDetailDialogProps {
   plant: PlantVM | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCare?: (type: CareType) => void;
+  /** Notify the host so it can surface a toast. */
+  onCare?: (message: string) => void;
 }
-
-const CARE_ACTIONS: { type: CareType; label: string }[] = [
-  { type: 'water', label: 'Water' },
-  { type: 'fertilize', label: 'Feed' },
-];
 
 function CareFact({ label, value }: { label: string; value: string }) {
   return (
@@ -34,7 +41,7 @@ function CareFact({ label, value }: { label: string; value: string }) {
       <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
-      <div className="mt-0.5 font-black text-foreground">{value}</div>
+      <div className="mt-0.5 font-black capitalize text-foreground">{value}</div>
     </div>
   );
 }
@@ -45,73 +52,124 @@ export function PlantDetailDialog({
   onOpenChange,
   onCare,
 }: PlantDetailDialogProps) {
-  const { carePlant } = useGarden();
+  const { plants, logCare } = useGarden();
+  const [waterOpen, setWaterOpen] = useState(false);
+
   if (!plant) return null;
 
-  const status = STATUS_META[plant.status];
+  // Read the live companion so health/cooldowns refresh right after caring.
+  const live = plants.find((p) => p.id === plant.id) ?? plant;
+  const status = STATUS_META[live.status];
+  const now = Date.now();
+  const kind = live.kind ?? 'plant'; // default for any legacy record
+  const actions = CARE_ACTIONS_BY_KIND[kind];
+  const isPet = kind === 'pet';
 
-  function handleCare(type: CareType) {
-    if (!plant) return;
-    carePlant(plant.id, type);
-    onCare?.(type);
+  function doCare(type: CareType) {
+    // Water is the skill mini-game; everything else is an instant tap.
+    if (type === 'water') {
+      setWaterOpen(true);
+      return;
+    }
+    logCare(live.id, type, CARE_META[type].xp);
+    onCare?.(`${CARE_META[type].verb} ${live.name} · +${CARE_META[type].xp} XP`);
+  }
+
+  function onWaterResult(xp: number, verdict: WaterVerdict) {
+    logCare(live.id, 'water', xp);
+    const msg =
+      verdict === 'overflow'
+        ? `You overwatered ${live.name} — go easy next time!`
+        : `Watered ${live.name}${xp > 0 ? ` · +${xp} XP` : ''}`;
+    onCare?.(msg);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <div className="flex items-center gap-4">
-            <PlantAvatar name={plant.name} className="h-14 w-14 text-lg" />
-            <div className="min-w-0">
-              <DialogTitle>{plant.name}</DialogTitle>
-              <DialogDescription className="italic">{plant.species}</DialogDescription>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="flex items-center gap-4">
+              <PlantAvatar name={live.name} kind={kind} className="h-14 w-14 text-lg" />
+              <div className="min-w-0">
+                <DialogTitle>{live.name}</DialogTitle>
+                <DialogDescription className="italic">{live.species}</DialogDescription>
+              </div>
+              <Badge variant="level" className="ml-auto">
+                Lv.{live.level}
+              </Badge>
             </div>
-            <Badge variant="level" className="ml-auto">
-              Lv.{plant.level}
-            </Badge>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
 
-        <div className="grid gap-4">
-          <div>
-            <div className="mb-1.5 flex items-center justify-between text-sm">
-              <span className="font-bold text-foreground">Health</span>
-              <span className="text-muted-foreground">{plant.healthScore}/100</span>
+          <div className="grid gap-4">
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-sm">
+                <span className="font-bold text-foreground">Health</span>
+                <span className="text-muted-foreground">{live.healthScore}/100</span>
+              </div>
+              <ProgressBar value={live.healthScore} className="bg-primary" />
+              <span
+                className={cn(
+                  'mt-2 inline-block rounded-full px-2.5 py-1 text-xs font-bold',
+                  status.tone
+                )}
+              >
+                {status.label}
+              </span>
             </div>
-            <ProgressBar value={plant.healthScore} className="bg-primary" />
-            <span
+
+            <div className="grid grid-cols-3 gap-2">
+              <CareFact label={isPet ? 'Water' : 'Water'} value={`${live.wateringIntervalDays}d`} />
+              <CareFact label={isPet ? 'Feed' : 'Feed'} value={`${live.fertilizingIntervalDays}d`} />
+              <CareFact label={isPet ? 'Type' : 'Light'} value={isPet ? 'Pet' : live.light} />
+            </div>
+
+            <div
               className={cn(
-                'mt-2 inline-block rounded-full px-2.5 py-1 text-xs font-bold',
-                status.tone
+                'grid gap-2',
+                actions.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
               )}
             >
-              {status.label}
-            </span>
+              {actions.map((type) => {
+                const Icon = CARE_ICON[type];
+                const remaining = careCooldownRemaining(live, type, now);
+                const locked = remaining > 0;
+                return (
+                  <Button
+                    key={type}
+                    variant="secondary"
+                    disabled={locked}
+                    onClick={() => doCare(type)}
+                    title={locked ? `Recently done — ready in ${formatCooldown(remaining)}` : undefined}
+                    className="flex-col gap-1 py-2 h-auto min-h-[3.5rem]"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {locked ? <Lock className="h-3.5 w-3.5" /> : <Icon className="h-4 w-4" />}
+                      {CARE_META[type].verb}
+                    </span>
+                    {locked && (
+                      <span className="text-[10px] font-bold text-muted-foreground">
+                        ready in {formatCooldown(remaining)}
+                      </span>
+                    )}
+                  </Button>
+                );
+              })}
+            </div>
+            <p className="text-center text-xs text-muted-foreground">
+              {isPet ? 'Care for your pet' : 'Care for your plant'} — but don&apos;t overdo it.
+              Each action rests for a while after you use it.
+            </p>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          <div className="grid grid-cols-3 gap-2">
-            <CareFact label="Water" value={`${plant.wateringIntervalDays}d`} />
-            <CareFact label="Feed" value={`${plant.fertilizingIntervalDays}d`} />
-            <CareFact label="Light" value={plant.light} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            {CARE_ACTIONS.map((action) => {
-              const Icon = CARE_ICON[action.type];
-              return (
-                <Button
-                  key={action.type}
-                  variant="secondary"
-                  onClick={() => handleCare(action.type)}
-                >
-                  <Icon className="h-4 w-4" />
-                  {action.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+      <WateringGame
+        open={waterOpen}
+        onOpenChange={setWaterOpen}
+        companionName={live.name}
+        onResult={onWaterResult}
+      />
+    </>
   );
 }

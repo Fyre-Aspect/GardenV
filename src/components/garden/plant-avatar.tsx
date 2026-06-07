@@ -1,17 +1,20 @@
-import { avatarTone, initials } from '@/lib/data';
+import { avatarTone, initials, type Kind } from '@/lib/data';
+import { KIND_ICON } from '@/components/garden/icons';
 import { cn } from '@/lib/utils';
 
 interface PlantAvatarProps {
   name: string;
+  kind?: Kind;
   className?: string;
   shape?: 'square' | 'round';
 }
 
 /**
- * Initial-letter avatar. Each name maps to one stable, muted tone so the set
- * reads as calm and cohesive. Replaces the old plant/testimonial emoji.
+ * Companion avatar. Each name maps to one stable, muted tone so the set reads
+ * calm and cohesive. Pets show a paw mark; plants show their initials.
  */
-export function PlantAvatar({ name, className, shape = 'square' }: PlantAvatarProps) {
+export function PlantAvatar({ name, kind = 'plant', className, shape = 'square' }: PlantAvatarProps) {
+  const Icon = KIND_ICON[kind];
   return (
     <div
       aria-hidden
@@ -22,7 +25,7 @@ export function PlantAvatar({ name, className, shape = 'square' }: PlantAvatarPr
         className
       )}
     >
-      {initials(name)}
+      {kind === 'pet' ? <Icon className="h-1/2 w-1/2" strokeWidth={2.25} /> : initials(name)}
     </div>
   );
 }

@@ -14,11 +14,15 @@ function buildSchema() {
   return {
     type: Type.OBJECT,
     properties: {
-      isPlant: { type: Type.BOOLEAN },
+      detected: { type: Type.BOOLEAN },
+      kind: { type: Type.STRING, enum: ['plant', 'pet'] },
       commonName: { type: Type.STRING },
       species: { type: Type.STRING },
       healthScore: { type: Type.INTEGER },
-      status: { type: Type.STRING, enum: ['healthy', 'water', 'fertilize', 'light'] },
+      status: {
+        type: Type.STRING,
+        enum: ['healthy', 'water', 'fertilize', 'light', 'feed', 'play'],
+      },
       summary: { type: Type.STRING },
       issues: { type: Type.ARRAY, items: { type: Type.STRING } },
       careTips: { type: Type.ARRAY, items: { type: Type.STRING } },
@@ -27,7 +31,8 @@ function buildSchema() {
       fertilizingIntervalDays: { type: Type.INTEGER },
     },
     required: [
-      'isPlant',
+      'detected',
+      'kind',
       'commonName',
       'species',
       'healthScore',
@@ -43,18 +48,23 @@ function buildSchema() {
 }
 
 const PROMPT = [
-  'You are an expert botanist and houseplant doctor analysing a single photo of a plant.',
-  'Identify the plant and assess its health from what is visible.',
+  'You are an expert botanist and veterinarian analysing a single photo of a plant OR a pet/animal.',
+  'Identify the subject and assess its apparent health and care needs from what is visible.',
   'Respond ONLY with JSON matching the schema. Guidance:',
-  '- isPlant: false if the image has no clear plant; then use empty/zero values elsewhere.',
-  '- commonName: everyday name (e.g. "Monstera"). species: scientific name if confident, else "Unknown species".',
+  '- detected: false if the image has no clear plant or pet; then use empty/zero values elsewhere.',
+  '- kind: "plant" for plants, "pet" for animals/pets.',
+  '- commonName: everyday name (e.g. "Monstera" or "Golden Retriever").',
+  '- species: scientific name for a plant, or breed/animal for a pet; "Unknown" if unsure.',
   '- healthScore: 0–100, where 90+ is thriving and below 60 needs attention.',
-  '- status: "healthy" if it looks good; otherwise the single most important action: "water", "fertilize", or "light".',
+  '- status: "healthy" if it looks good; otherwise the single most important action.',
+  '  For PLANTS use one of: "water", "fertilize", "light".',
+  '  For PETS use one of: "feed", "water", "play".',
   '- summary: one warm, encouraging sentence the owner reads first.',
   '- issues: short phrases for visible problems (empty if healthy).',
-  '- careTips: 2–4 concise, actionable tips.',
-  '- light: the light level this species prefers.',
-  '- wateringIntervalDays / fertilizingIntervalDays: typical care cadence for this species.',
+  '- careTips: 2–4 concise, actionable care tips appropriate to a plant or pet.',
+  '- light: light level a plant prefers; for pets just use "medium".',
+  '- wateringIntervalDays: how often to water (plant) or refresh water (pet, usually 1).',
+  '- fertilizingIntervalDays: feeding cadence — fertiliser for plants, meals for pets (e.g. 1).',
 ].join('\n');
 
 export async function POST(request: Request) {

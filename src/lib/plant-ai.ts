@@ -1,15 +1,19 @@
-import type { LightLevel, PlantStatus } from '@/lib/data';
+import type { Kind, LightLevel, PlantStatus } from '@/lib/data';
 
 /**
- * Plant scanning client. The actual Gemini call happens server-side in
+ * Companion scanning client. The actual Gemini call happens server-side in
  * `src/app/api/scan/route.ts` (so the API key never reaches the browser); this
- * just POSTs the captured image there and returns the parsed result.
+ * just POSTs the captured image there and returns the parsed result. Works for
+ * both plants and pets.
  */
 
 export interface PlantScanResult {
-  /** False when the photo doesn't contain a recognisable plant. */
-  isPlant: boolean;
+  /** False when the photo contains no recognisable plant or pet. */
+  detected: boolean;
+  /** Whether the subject is a plant or a pet. */
+  kind: Kind;
   commonName: string;
+  /** Scientific name (plant) or breed/animal (pet). */
   species: string;
   /** 0–100. */
   healthScore: number;

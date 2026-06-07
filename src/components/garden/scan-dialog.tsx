@@ -116,9 +116,9 @@ export function ScanDialog({ open, onOpenChange, onScanned }: ScanDialogProps) {
         const mime = /data:(.*?);/.exec(meta)?.[1] ?? 'image/jpeg';
         const res = await scanPlant(base64, mime);
 
-        if (!res.isPlant) {
+        if (!res.detected) {
           setErrorMsg(
-            "I couldn't spot a plant in that photo. Try again with the plant filling the frame."
+            "I couldn't spot a plant or pet in that photo. Try again with the subject filling the frame."
           );
           setPhase('error');
           return;
@@ -127,6 +127,7 @@ export function ScanDialog({ open, onOpenChange, onScanned }: ScanDialogProps) {
         const plant = addScannedPlant({
           name: res.commonName,
           species: res.species,
+          kind: res.kind,
           status: res.status,
           healthScore: Math.max(0, Math.min(100, Math.round(res.healthScore))),
           light: res.light,
@@ -185,11 +186,11 @@ export function ScanDialog({ open, onOpenChange, onScanned }: ScanDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ScanLine className="h-5 w-5 text-primary" />
-            Scan a plant
+            Scan a plant or pet
           </DialogTitle>
           <DialogDescription>
-            {phase === 'camera' && 'Point your camera at a plant and capture a photo for an instant AI health check.'}
-            {phase === 'analyzing' && 'Reading leaf colour, shape and health markers…'}
+            {phase === 'camera' && 'Point your camera at a plant or pet and capture a photo for an instant AI health check.'}
+            {phase === 'analyzing' && 'Identifying your companion and checking its health…'}
             {phase === 'result' && 'Here’s what the scan found.'}
             {phase === 'error' && 'Let’s try that again.'}
           </DialogDescription>

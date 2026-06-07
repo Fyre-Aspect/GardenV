@@ -169,7 +169,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
         <section>
           <SectionHeader title="My garden">
             <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4" /> Add plant
+              <Plus className="h-4 w-4" /> Add
             </Button>
           </SectionHeader>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -206,7 +206,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
         plant={selectedPlant}
         open={detailOpen}
         onOpenChange={setDetailOpen}
-        onCare={() => showToast('Care logged')}
+        onCare={(message) => showToast(message)}
       />
     </div>
   );

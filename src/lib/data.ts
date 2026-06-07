@@ -7,21 +7,29 @@
  * the components don't need to change.
  */
 
-export type CareType = 'water' | 'fertilize' | 'light';
-export type PlantStatus = 'healthy' | 'water' | 'fertilize' | 'light';
+/** A cared-for living thing is either a plant or a pet. */
+export type Kind = 'plant' | 'pet';
+export type CareType = 'water' | 'fertilize' | 'light' | 'feed' | 'play';
+export type PlantStatus = 'healthy' | 'water' | 'fertilize' | 'light' | 'feed' | 'play';
 export type LightLevel = 'low' | 'medium' | 'bright';
 
 export interface PlantVM {
   id: string;
   name: string;
   species: string;
+  kind: Kind;
   level: number;
   status: PlantStatus;
   healthScore: number; // 0–100
   wateringIntervalDays: number;
   fertilizingIntervalDays: number;
   light: LightLevel;
+  /** Epoch-ms of the last time each care action was performed (drives cooldowns). */
+  lastCare?: Partial<Record<CareType, number>>;
 }
+
+/** Garden V cares for plants *and* pets; `CompanionVM` reads better for pets. */
+export type CompanionVM = PlantVM;
 
 export interface TaskVM {
   id: string;
@@ -74,6 +82,8 @@ export const CARE_META: Record<
   water: { verb: 'Water', label: 'Watering', xp: 10 },
   fertilize: { verb: 'Fertilize', label: 'Feeding', xp: 20 },
   light: { verb: 'Move to light', label: 'Light', xp: 5 },
+  feed: { verb: 'Feed', label: 'Feeding', xp: 15 },
+  play: { verb: 'Play with', label: 'Play', xp: 15 },
 };
 
 export const STATUS_META: Record<
@@ -84,14 +94,53 @@ export const STATUS_META: Record<
   water: { label: 'Needs water', tone: 'bg-secondary text-secondary-foreground' },
   fertilize: { label: 'Needs feeding', tone: 'bg-reward-soft text-reward-foreground' },
   light: { label: 'Needs light', tone: 'bg-muted text-muted-foreground' },
+  feed: { label: 'Hungry', tone: 'bg-reward-soft text-reward-foreground' },
+  play: { label: 'Wants to play', tone: 'bg-secondary text-secondary-foreground' },
 };
 
-/** A care task maps 1:1 to the plant status it resolves. */
+/** A care task maps 1:1 to the status it resolves. */
 export const CARE_TO_STATUS: Record<CareType, PlantStatus> = {
   water: 'water',
   fertilize: 'fertilize',
   light: 'light',
+  feed: 'feed',
+  play: 'play',
 };
+
+// ── Kinds & per-kind care ──────────────────────────────────────────────────
+export const KIND_META: Record<Kind, { label: string; noun: string }> = {
+  plant: { label: 'Plant', noun: 'plant' },
+  pet: { label: 'Pet', noun: 'pet' },
+};
+
+/** Care actions each kind supports — drives the detail-view action buttons. */
+export const CARE_ACTIONS_BY_KIND: Record<Kind, CareType[]> = {
+  plant: ['water', 'fertilize'],
+  pet: ['feed', 'water', 'play'],
+};
+
+/**
+ * Caring again within this window counts as "overdoing it" and is blocked — a
+ * short, forgiving cooldown rather than a hard per-schedule lock.
+ */
+export const CARE_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+/** Remaining cooldown (ms) before `type` may be performed on a companion again. */
+export function careCooldownRemaining(
+  companion: Pick<PlantVM, 'lastCare'>,
+  type: CareType,
+  now: number = Date.now()
+): number {
+  const last = companion.lastCare?.[type];
+  if (!last) return 0;
+  return Math.max(0, CARE_COOLDOWN_MS - (now - last));
+}
+
+/** Compact remaining-cooldown label, e.g. "5h" or "12m". */
+export function formatCooldown(ms: number): string {
+  const mins = Math.ceil(ms / 60000);
+  return mins >= 60 ? `${Math.ceil(mins / 60)}h` : `${mins}m`;
+}
 
 // ── Avatar palette ────────────────────────────────────────────────────────
 // Soft, muted tints. Each plant gets one stable colour (picked by name hash),
@@ -119,57 +168,3 @@ export function initials(name: string): string {
   if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
-
-// ── Seed data ─────────────────────────────────────────────────────────────
-export const SEED_PLANTS: PlantVM[] = [
-  {
-    id: 'p1',
-    name: 'Klaus',
-    species: 'Monstera deliciosa',
-    level: 8,
-    status: 'water',
-    healthScore: 86,
-    wateringIntervalDays: 7,
-    fertilizingIntervalDays: 30,
-    light: 'medium',
-  },
-  {
-    id: 'p2',
-    name: 'Sandy',
-    species: 'Cactus mix',
-    level: 3,
-    status: 'healthy',
-    healthScore: 94,
-    wateringIntervalDays: 21,
-    fertilizingIntervalDays: 60,
-    light: 'bright',
-  },
-  {
-    id: 'p3',
-    name: 'Lila',
-    species: 'Peace Lily',
-    level: 5,
-    status: 'fertilize',
-    healthScore: 78,
-    wateringIntervalDays: 5,
-    fertilizingIntervalDays: 21,
-    light: 'low',
-  },
-  {
-    id: 'p4',
-    name: 'Frank',
-    species: 'Fiddle Leaf Fig',
-    level: 6,
-    status: 'light',
-    healthScore: 71,
-    wateringIntervalDays: 9,
-    fertilizingIntervalDays: 30,
-    light: 'bright',
-  },
-];
-
-export const SEED_TASKS: TaskVM[] = [
-  { id: 't1', plantId: 'p1', plantName: 'Klaus', type: 'water', done: false, xp: CARE_META.water.xp },
-  { id: 't2', plantId: 'p3', plantName: 'Lila', type: 'fertilize', done: false, xp: CARE_META.fertilize.xp },
-  { id: 't3', plantId: 'p4', plantName: 'Frank', type: 'light', done: false, xp: CARE_META.light.xp },
-];

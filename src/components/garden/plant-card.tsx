@@ -29,7 +29,7 @@ export function PlantCard({ plant, onClick }: PlantCardProps) {
     >
       <Card className="h-full border-border p-5 transition-colors hover:border-primary/30 hover:shadow-md">
         <div className="mb-4 flex items-start justify-between">
-          <PlantAvatar name={plant.name} className="h-12 w-12 text-base" />
+          <PlantAvatar name={plant.name} kind={plant.kind} className="h-12 w-12 text-base" />
           <Badge variant="level">Lv.{plant.level}</Badge>
         </div>
         <div className="font-black text-foreground">{plant.name}</div>
