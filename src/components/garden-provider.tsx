@@ -68,6 +68,7 @@ interface GardenContextValue {
   undoTask: (taskId: string) => void;
   addPlant: (input: NewPlantInput) => PlantVM;
   addScannedPlant: (input: ScannedPlantInput) => PlantVM;
+  removePlant: (id: string) => void;
   /** Record a care action: marks healthy, stamps the cooldown, awards `xp`. */
   logCare: (plantId: string, type: CareType, xp: number) => void;
   acknowledgeLevelUp: () => void;
@@ -352,6 +353,11 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     return plant;
   }, []);
 
+  const removePlant = useCallback((id: string) => {
+    setPlants((prev) => prev.filter((p) => p.id !== id));
+    setTasks((prev) => prev.filter((t) => t.plantId !== id));
+  }, []);
+
   const logCare = useCallback(
     (plantId: string, type: CareType, xp: number) => {
       setPlants((prev) =>
@@ -427,6 +433,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       undoTask,
       addPlant,
       addScannedPlant,
+      removePlant,
       logCare,
       acknowledgeLevelUp,
       acknowledgeStreak,
@@ -446,6 +453,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       undoTask,
       addPlant,
       addScannedPlant,
+      removePlant,
       logCare,
       acknowledgeLevelUp,
       acknowledgeStreak,
