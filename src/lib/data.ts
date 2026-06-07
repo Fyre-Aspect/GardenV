@@ -26,6 +26,13 @@ export interface PlantVM {
   light: LightLevel;
   /** Epoch-ms of the last time each care action was performed (drives cooldowns). */
   lastCare?: Partial<Record<CareType, number>>;
+  /** User-assigned photo (downscaled data URL) for extra context on the card. */
+  photoUrl?: string;
+  /**
+   * weekKey of the last photo health check. Health is judged only from these
+   * check-ins — never from watering/feeding — and one is prompted each week.
+   */
+  lastHealthCheckWeek?: string;
 }
 
 /** Kindred cares for plants *and* pets; `CompanionVM` reads better for pets. */
@@ -242,4 +249,71 @@ export function nextStreak(prevStreak: number, lastActiveDay: string | undefined
   const yesterday = dayKey(new Date(Date.now() - 86_400_000));
   if (lastActiveDay === yesterday) return prevStreak + 1;
   return 1;
+}
+
+// ── Daily care needs (exact amounts) ────────────────────────────────────────
+// Care is purely for in-app progress (XP, streaks) — it never moves a
+// companion's health. Health comes only from the weekly photo check below.
+
+/** Days between performing a given care action (0 if the companion never needs it). */
+export function careIntervalDays(plant: PlantVM, type: CareType): number {
+  if (type === 'water') return plant.wateringIntervalDays;
+  if (type === 'fertilize' || type === 'feed') return plant.fertilizingIntervalDays;
+  return 0;
+}
+
+/**
+ * Whole days until `type` is next due. `0` or negative means it's needed today
+ * (negative = overdue); `Infinity` for actions a companion doesn't schedule.
+ */
+export function careDueInDays(plant: PlantVM, type: CareType, now: number = Date.now()): number {
+  const interval = careIntervalDays(plant, type);
+  if (!interval) return Infinity;
+  const last = plant.lastCare?.[type];
+  if (!last) return 0; // never done → due now
+  const elapsedDays = (now - last) / 86_400_000;
+  return Math.ceil(interval - elapsedDays);
+}
+
+/** The exact amount to give for a care action, phrased for the companion's kind. */
+export function careAmount(plant: PlantVM, type: CareType): string {
+  switch (type) {
+    case 'water': {
+      const ml = plant.kind === 'pet' ? 400 : plant.light === 'bright' ? 300 : 200;
+      return `about ${ml} ml of water`;
+    }
+    case 'feed':
+      return '1 full portion';
+    case 'fertilize':
+      return 'a half-strength dose of feed';
+    case 'light':
+      return 'a few hours of bright, indirect light';
+  }
+}
+
+export interface CareNeed {
+  type: CareType;
+  /** ≤ 0 means needed today. */
+  dueInDays: number;
+  /** Exact amount to give, e.g. "about 200 ml of water". */
+  amount: string;
+}
+
+/** Today's full care plan for a companion: what to do, how much, and when. */
+export function dailyCareNeeds(plant: PlantVM, now: number = Date.now()): CareNeed[] {
+  return CARE_ACTIONS_BY_KIND[plant.kind ?? 'plant'].map((type) => ({
+    type,
+    dueInDays: careDueInDays(plant, type, now),
+    amount: careAmount(plant, type),
+  }));
+}
+
+// ── Weekly photo health check ───────────────────────────────────────────────
+/**
+ * A photo health check is due once per week (Monday-started, matching the
+ * league week). Until one is taken, the companion's health is treated as
+ * unknown and the user is nudged to snap a fresh photo.
+ */
+export function healthCheckDue(plant: PlantVM, now: Date = new Date()): boolean {
+  return plant.lastHealthCheckWeek !== weekKey(now);
 }

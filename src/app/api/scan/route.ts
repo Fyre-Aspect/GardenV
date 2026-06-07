@@ -21,7 +21,7 @@ function buildSchema() {
       healthScore: { type: Type.INTEGER },
       status: {
         type: Type.STRING,
-        enum: ['healthy', 'water', 'fertilize', 'light', 'feed', 'play'],
+        enum: ['healthy', 'water', 'fertilize', 'light', 'feed'],
       },
       summary: { type: Type.STRING },
       issues: { type: Type.ARRAY, items: { type: Type.STRING } },
@@ -58,7 +58,7 @@ const PROMPT = [
   '- healthScore: 0–100, where 90+ is thriving and below 60 needs attention.',
   '- status: "healthy" if it looks good; otherwise the single most important action.',
   '  For PLANTS use one of: "water", "fertilize", "light".',
-  '  For PETS use one of: "feed", "water", "play".',
+  '  For PETS use one of: "feed", "water".',
   '- summary: one warm, encouraging sentence the owner reads first.',
   '- issues: short phrases for visible problems (empty if healthy).',
   '- careTips: 2–4 concise, actionable care tips appropriate to a plant or pet.',

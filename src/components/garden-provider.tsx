@@ -12,7 +12,6 @@ import {
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import {
   CARE_META,
-  CARE_TO_STATUS,
   dayKey,
   deriveProgress,
   isStreakMilestone,
@@ -47,6 +46,18 @@ interface ScannedPlantInput {
   light: LightLevel;
   wateringIntervalDays: number;
   fertilizingIntervalDays: number;
+  /** Set when the companion was added from an actual photo. */
+  photoUrl?: string;
+}
+
+/** Result of a weekly photo health check on an existing companion. */
+interface HealthCheckInput {
+  healthScore: number;
+  status: PlantStatus;
+  photoUrl?: string;
+  light?: LightLevel;
+  wateringIntervalDays?: number;
+  fertilizingIntervalDays?: number;
 }
 
 interface GardenContextValue {
@@ -69,8 +80,12 @@ interface GardenContextValue {
   addPlant: (input: NewPlantInput) => PlantVM;
   addScannedPlant: (input: ScannedPlantInput) => PlantVM;
   removePlant: (id: string) => void;
-  /** Record a care action: marks healthy, stamps the cooldown, awards `xp`. */
+  /** Record a care action: stamps the cooldown + awards `xp` (never touches health). */
   logCare: (plantId: string, type: CareType, xp: number) => void;
+  /** Attach or replace a companion's photo. */
+  setPlantPhoto: (id: string, photoUrl: string) => void;
+  /** Record this week's photo health check — the only thing that moves health. */
+  recordHealthCheck: (id: string, input: HealthCheckInput) => void;
   acknowledgeLevelUp: () => void;
   acknowledgeStreak: () => void;
 }
@@ -103,6 +118,8 @@ const EMPTY_GARDEN: PersistShape = {
 
 /** XP awarded for scanning and cataloguing a new companion. */
 export const SCAN_XP = 25;
+/** XP awarded for completing a weekly photo health check. */
+export const HEALTH_CHECK_XP = 15;
 
 const gardenDoc = (uid: string) => doc(db, 'gardens', uid);
 /** Public leaderboard mirror — one doc per user, readable by all. */
@@ -301,19 +318,16 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     if (isStreakMilestone(ns)) setJustHitStreak(ns);
   }, []);
 
-  const setPlantStatus = useCallback((plantId: string, status: PlantStatus) => {
-    setPlants((prev) => prev.map((p) => (p.id === plantId ? { ...p, status } : p)));
-  }, []);
-
   const completeTask = useCallback(
     (taskId: string) => {
       const task = tasksRef.current.find((t) => t.id === taskId);
       if (!task || task.done) return;
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: true } : t)));
+      // Care only stamps the cooldown/schedule — health is left untouched.
       setPlants((prev) =>
         prev.map((p) =>
           p.id === task.plantId
-            ? { ...p, status: 'healthy', lastCare: { ...p.lastCare, [task.type]: Date.now() } }
+            ? { ...p, lastCare: { ...p.lastCare, [task.type]: Date.now() } }
             : p
         )
       );
@@ -328,10 +342,9 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       const task = tasksRef.current.find((t) => t.id === taskId);
       if (!task || !task.done) return;
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done: false } : t)));
-      setPlantStatus(task.plantId, CARE_TO_STATUS[task.type]);
       changeXp(-task.xp);
     },
-    [changeXp, setPlantStatus]
+    [changeXp]
   );
 
   const addPlant = useCallback((input: NewPlantInput): PlantVM => {
@@ -358,12 +371,42 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     setTasks((prev) => prev.filter((t) => t.plantId !== id));
   }, []);
 
+  const setPlantPhoto = useCallback((id: string, photoUrl: string) => {
+    setPlants((prev) => prev.map((p) => (p.id === id ? { ...p, photoUrl } : p)));
+  }, []);
+
+  const recordHealthCheck = useCallback(
+    (id: string, input: HealthCheckInput) => {
+      setPlants((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                healthScore: Math.max(0, Math.min(100, Math.round(input.healthScore))),
+                status: input.status,
+                photoUrl: input.photoUrl ?? p.photoUrl,
+                light: input.light ?? p.light,
+                wateringIntervalDays: input.wateringIntervalDays ?? p.wateringIntervalDays,
+                fertilizingIntervalDays: input.fertilizingIntervalDays ?? p.fertilizingIntervalDays,
+                lastHealthCheckWeek: weekKey(),
+              }
+            : p
+        )
+      );
+      changeXp(HEALTH_CHECK_XP);
+      registerActivity();
+    },
+    [changeXp, registerActivity]
+  );
+
   const logCare = useCallback(
     (plantId: string, type: CareType, xp: number) => {
+      // Care only resets the schedule + awards XP. Health is unaffected — it's
+      // judged solely by the weekly photo check.
       setPlants((prev) =>
         prev.map((p) =>
           p.id === plantId
-            ? { ...p, status: 'healthy', lastCare: { ...p.lastCare, [type]: Date.now() } }
+            ? { ...p, lastCare: { ...p.lastCare, [type]: Date.now() } }
             : p
         )
       );
@@ -389,23 +432,12 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         fertilizingIntervalDays: input.fertilizingIntervalDays,
         light: input.light,
         lastCare: {},
+        photoUrl: input.photoUrl,
+        // A photo at add-time counts as this week's health check; a text-only
+        // add (no photo) leaves the weekly check due so we prompt for one.
+        lastHealthCheckWeek: input.photoUrl ? weekKey() : undefined,
       };
       setPlants((prev) => [...prev, plant]);
-
-      if (input.status !== 'healthy') {
-        const type = input.status as CareType;
-        setTasks((prev) => [
-          ...prev,
-          {
-            id: `t-${Date.now()}`,
-            plantId: id,
-            plantName: plant.name,
-            type,
-            done: false,
-            xp: CARE_META[type].xp,
-          },
-        ]);
-      }
 
       changeXp(SCAN_XP);
       registerActivity();
@@ -435,6 +467,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       addScannedPlant,
       removePlant,
       logCare,
+      setPlantPhoto,
+      recordHealthCheck,
       acknowledgeLevelUp,
       acknowledgeStreak,
     }),
@@ -455,6 +489,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       addScannedPlant,
       removePlant,
       logCare,
+      setPlantPhoto,
+      recordHealthCheck,
       acknowledgeLevelUp,
       acknowledgeStreak,
     ]

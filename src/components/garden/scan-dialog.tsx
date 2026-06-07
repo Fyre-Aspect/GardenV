@@ -21,9 +21,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useGarden, SCAN_XP } from '@/components/garden-provider';
-import { STATUS_META } from '@/lib/data';
+import { useGarden, SCAN_XP, HEALTH_CHECK_XP } from '@/components/garden-provider';
+import { STATUS_META, type PlantVM } from '@/lib/data';
 import { scanPlant, type PlantScanResult } from '@/lib/plant-ai';
+import { downscaleDataUrl } from '@/lib/image';
 import { cn } from '@/lib/utils';
 
 type Phase = 'camera' | 'analyzing' | 'result' | 'error';
@@ -33,13 +34,21 @@ interface ScanDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Fired after a successful scan so the host can surface a notification. */
   onScanned?: (info: { name: string; message: string; xp: number }) => void;
+  /**
+   * When set, the scan is a weekly health check for this existing companion
+   * rather than adding a new one — it updates that companion's health + photo.
+   */
+  target?: PlantVM | null;
 }
 
 const MAX_DIM = 800; // downscale captured frames before sending to the model
 
-export function ScanDialog({ open, onOpenChange, onScanned }: ScanDialogProps) {
-  const { addScannedPlant } = useGarden();
+export function ScanDialog({ open, onOpenChange, onScanned, target }: ScanDialogProps) {
+  const { addScannedPlant, recordHealthCheck } = useGarden();
   const reduce = useReducedMotion();
+
+  const isHealthCheck = !!target;
+  const xpAwarded = isHealthCheck ? HEALTH_CHECK_XP : SCAN_XP;
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -124,15 +133,35 @@ export function ScanDialog({ open, onOpenChange, onScanned }: ScanDialogProps) {
           return;
         }
 
+        // Keep a small thumbnail on the companion for context on the card.
+        const photoUrl = await downscaleDataUrl(dataUrl, 400, 0.78).catch(() => undefined);
+        const health = Math.max(0, Math.min(100, Math.round(res.healthScore)));
+
+        if (target) {
+          recordHealthCheck(target.id, {
+            healthScore: health,
+            status: res.status,
+            photoUrl,
+            light: res.light,
+            wateringIntervalDays: res.wateringIntervalDays,
+            fertilizingIntervalDays: res.fertilizingIntervalDays,
+          });
+          setResult(res);
+          setPhase('result');
+          onScanned?.({ name: target.name, message: res.summary, xp: HEALTH_CHECK_XP });
+          return;
+        }
+
         const plant = addScannedPlant({
           name: res.commonName,
           species: res.species,
           kind: res.kind,
           status: res.status,
-          healthScore: Math.max(0, Math.min(100, Math.round(res.healthScore))),
+          healthScore: health,
           light: res.light,
           wateringIntervalDays: res.wateringIntervalDays,
           fertilizingIntervalDays: res.fertilizingIntervalDays,
+          photoUrl,
         });
 
         setResult(res);
@@ -146,7 +175,7 @@ export function ScanDialog({ open, onOpenChange, onScanned }: ScanDialogProps) {
         setPhase('error');
       }
     },
-    [addScannedPlant, onScanned, stopCamera]
+    [addScannedPlant, recordHealthCheck, target, onScanned, stopCamera]
   );
 
   function capture() {
@@ -186,10 +215,13 @@ export function ScanDialog({ open, onOpenChange, onScanned }: ScanDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ScanLine className="h-5 w-5 text-primary" />
-            Scan a plant or pet
+            {isHealthCheck ? `${target!.name} · Health check` : 'Scan a plant or pet'}
           </DialogTitle>
           <DialogDescription>
-            {phase === 'camera' && 'Point your camera at a plant or pet and capture a photo for an instant AI health check.'}
+            {phase === 'camera' &&
+              (isHealthCheck
+                ? `Take a fresh photo of ${target!.name} for this week's health check.`
+                : 'Point your camera at a plant or pet and capture a photo for an instant AI health check.')}
             {phase === 'analyzing' && 'Identifying your companion and checking its health…'}
             {phase === 'result' && 'Here’s what the scan found.'}
             {phase === 'error' && 'Let’s try that again.'}
@@ -325,11 +357,11 @@ export function ScanDialog({ open, onOpenChange, onScanned }: ScanDialogProps) {
 
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-reward-soft px-3 py-1 text-xs font-black text-reward-foreground">
-                <Sparkles className="h-3.5 w-3.5" />+{SCAN_XP} XP
+                <Sparkles className="h-3.5 w-3.5" />+{xpAwarded} XP
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-xs font-black text-accent-foreground">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Added to your garden
+                {isHealthCheck ? 'Health check saved' : 'Added to your garden'}
               </span>
             </div>
           </div>

@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Leaf, Plus, ScanLine } from 'lucide-react';
+import { Bell, Camera, Leaf, Plus, ScanLine, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useGarden } from '@/components/garden-provider';
@@ -10,7 +10,7 @@ import { SectionHeader } from '@/components/garden/section-header';
 import { StreakDots } from '@/components/garden/streak-dots';
 import { ProgressBar } from '@/components/garden/progress-bar';
 import { PlantCard } from '@/components/garden/plant-card';
-import { TaskCard } from '@/components/garden/task-card';
+import { PlantAvatar } from '@/components/garden/plant-avatar';
 import { Toast, type ToastState } from '@/components/garden/toast';
 import { AddPlantDialog } from '@/components/garden/add-plant-dialog';
 import { ScanDialog } from '@/components/garden/scan-dialog';
@@ -18,32 +18,38 @@ import { PlantDetailDialog } from '@/components/garden/plant-detail-dialog';
 import { LevelUpCelebration } from '@/components/garden/level-up-celebration';
 import { MilestoneCelebration } from '@/components/garden/milestone-celebration';
 import { LeaderboardDialog } from '@/components/garden/leaderboard-dialog';
+import {
+  CARE_META,
+  dailyCareNeeds,
+  healthCheckDue,
+  weekKey,
+  type CareNeed,
+  type PlantVM,
+} from '@/lib/data';
 import { cn } from '@/lib/utils';
-import type { PlantVM } from '@/lib/data';
 
 interface DashboardProps {
   onSignOut: () => void;
 }
 
+interface DueCareItem {
+  plant: PlantVM;
+  need: CareNeed;
+}
+
 export default function Dashboard({ onSignOut }: DashboardProps) {
-  const {
-    plants,
-    tasks,
-    streak,
-    progress,
-    league,
-    completeTask,
-    undoTask,
-  } = useGarden();
+  const { plants, streak, progress, league } = useGarden();
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
 
   const [addOpen, setAddOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [scanTarget, setScanTarget] = useState<PlantVM | null>(null);
   const [selectedPlant, setSelectedPlant] = useState<PlantVM | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | 'unsupported'>('unsupported');
 
   function showToast(message: string, action?: { label: string; fn: () => void }) {
     window.clearTimeout(toastTimer.current);
@@ -51,19 +57,64 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
     toastTimer.current = window.setTimeout(() => setToast(null), action ? 4000 : 2200);
   }
 
-  function handleComplete(taskId: string, xp: number) {
-    completeTask(taskId);
-    showToast(`+${xp} XP`, { label: 'Undo', fn: () => undoTask(taskId) });
-  }
-
   function openPlant(plant: PlantVM) {
     setSelectedPlant(plant);
     setDetailOpen(true);
   }
 
-  const remaining = tasks.filter((t) => !t.done).length;
-  const allDone = remaining === 0;
+  function startHealthCheck(plant: PlantVM) {
+    setDetailOpen(false);
+    setScanTarget(plant);
+    setScanOpen(true);
+  
+  function openScanNew() {
+    setScanTarget(null);
+    setScanOpen(true);
+  }
+
+  // ── Derived: what's due right now, and which companions need a health check ──
+  const careItems = useMemo<DueCareItem[]>(() => {
+    const now = Date.now();
+    const items: DueCareItem[] = [];
+    for (const plant of plants) {
+      for (const need of dailyCareNeeds(plant, now)) {
+        if (need.dueInDays <= 0) items.push({ plant, need });
+      }
+    }
+    return items;
+  }, [plants]);
+
+  const checkDue = useMemo(() => plants.filter((p) => healthCheckDue(p)), [plants]);
+  const dueNames = checkDue.map((p) => p.name).join(', ');
+  const allCaredFor = careItems.length === 0;
   const xpPct = (progress.xpIntoLevel / progress.xpForNext) * 100;
+
+  // Detect notification support / permission on mount.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotifPerm(Notification.permission);
+    }
+  }, []);
+
+  // Fire one local notification per week when checks are due (if allowed).
+  useEffect(() => {
+    if (notifPerm !== 'granted' || checkDue.length === 0) return;
+    const key = `kindred:hc-notif:${weekKey()}`;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+      new Notification('Kindred · weekly health check', {
+        body: `Time for a photo health check: ${dueNames}.`,
+      });
+    } catch {
+      /* notifications are best-effort */
+    }
+  }, [notifPerm, checkDue.length, dueNames]);
+
+  function enableReminders() {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    Notification.requestPermission().then(setNotifPerm);
+  }
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background font-sans">
@@ -88,29 +139,26 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
             <button
               onClick={() => setLeaderboardOpen(true)}
               className={cn(
-                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black transition-opacity hover:opacity-80 border border-border bg-secondary/30',
+                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black transition-opacity hover:opacity-80',
                 league.badge
               )}
               aria-label={`${league.name} league — view leaderboard`}
             >
+              <Trophy className="h-3.5 w-3.5" aria-hidden />
               <span className="hidden sm:inline">{league.name}</span>
             </button>
-            <div
-              className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold text-reward-foreground border border-reward/20 bg-reward/10"
-              aria-label={`${streak} day streak`}
-            >
-              <span aria-hidden>{streak} d</span>
+            <div className="text-sm font-bold text-foreground" aria-label={`${streak} day streak`}>
+              {streak}
+              <span className="ml-1 font-medium text-muted-foreground">
+                day{streak === 1 ? '' : 's'}
+              </span>
             </div>
-            <motion.div
-              key={progress.xpIntoLevel}
-              initial={{ scale: 1 }}
-              animate={{ scale: [1, 1.18, 1] }}
-              transition={{ duration: 0.4 }}
-              className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold text-foreground border border-border bg-secondary/30"
+            <div
+              className="text-sm font-bold text-foreground"
               aria-label={`${progress.xpIntoLevel} XP toward level ${progress.level + 1}`}
             >
-              <span aria-hidden>{progress.xpIntoLevel} XP</span>
-            </motion.div>
+              {progress.xpIntoLevel} XP
+            </div>
             <button
               onClick={onSignOut}
               className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -131,16 +179,16 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
                 Good morning, Gardener
               </h1>
               <p className="mt-1 text-muted-foreground">
-                {allDone
-                  ? "All done for today. Nicely kept."
-                  : `You have ${remaining} ${remaining === 1 ? 'task' : 'tasks'} today. Keep the streak alive.`}
+                {allCaredFor
+                  ? 'All cared for today. Nicely kept.'
+                  : `${careItems.length} ${careItems.length === 1 ? 'thing' : 'things'} need attention today.`}
               </p>
             </div>
-            <div className="flex shrink-0 flex-col items-center rounded-2xl border border-border bg-reward-soft/60 px-4 py-2.5">
-              <div className="text-lg font-black leading-none text-reward-foreground">
-                {streak}
+            <div className="flex shrink-0 flex-col items-center justify-center rounded-2xl border border-border bg-secondary/50 px-5 py-3">
+              <div className="text-2xl font-black leading-none text-foreground">{streak}</div>
+              <div className="mt-1 text-xs font-medium text-muted-foreground">
+                day{streak === 1 ? '' : 's'} streak
               </div>
-              <div className="text-xs font-medium text-reward-foreground/70">days</div>
             </div>
           </div>
           <StreakDots filled={Math.min(streak, 7)} className="mt-5" />
@@ -164,18 +212,80 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
           </div>
         </Card>
 
-        {/* ── TASKS ── */}
+        {/* ── WEEKLY HEALTH CHECK ── */}
+        {checkDue.length > 0 && (
+          <Card className="mb-8 border-reward/30 bg-reward-soft/40 p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-reward/15 text-reward">
+                <Camera className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-black text-foreground">Weekly health check</div>
+                <p className="text-sm text-muted-foreground">
+                  Health is judged from photos, not watering. Snap a fresh picture to update it.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {checkDue.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => startHealthCheck(p)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-reward/40 bg-background px-3 py-1.5 text-sm font-bold text-foreground transition-colors hover:bg-reward-soft"
+                    >
+                      <Camera className="h-3.5 w-3.5 text-reward" />
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+                {notifPerm === 'default' && (
+                  <button
+                    onClick={enableReminders}
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-reward-foreground/80 transition-colors hover:text-reward-foreground"
+                  >
+                    <Bell className="h-3.5 w-3.5" />
+                    Turn on weekly reminders
+                  </button>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* ── TODAY'S CARE (exact amounts) ── */}
         <section className="mb-10">
           <SectionHeader title="Today's care" />
-          <div className="space-y-3">
-            {tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onComplete={() => handleComplete(task.id, task.xp)}
-              />
-            ))}
-          </div>
+          {allCaredFor ? (
+            <Card className="border-border p-6 text-center text-sm text-muted-foreground">
+              Nothing due today — your companions are all set.
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {careItems.map(({ plant, need }) => (
+                <button
+                  key={`${plant.id}-${need.type}`}
+                  onClick={() => openPlant(plant)}
+                  className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-primary/30"
+                >
+                  {plant.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={plant.photoUrl}
+                      alt={plant.name}
+                      className="h-11 w-11 shrink-0 rounded-xl object-cover"
+                    />
+                  ) : (
+                    <PlantAvatar name={plant.name} kind={plant.kind} className="h-11 w-11 text-sm" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-black text-foreground">
+                      {CARE_META[need.type].verb} {plant.name}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Give {need.amount}</div>
+                  </div>
+                  <span className="shrink-0 text-sm font-bold text-primary">Care →</span>
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* ── GARDEN ── */}
@@ -185,11 +295,17 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
               <Plus className="h-4 w-4" /> Add
             </Button>
           </SectionHeader>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {plants.map((plant) => (
-              <PlantCard key={plant.id} plant={plant} onClick={() => openPlant(plant)} />
-            ))}
-          </div>
+          {plants.length === 0 ? (
+            <Card className="border-border p-8 text-center text-sm text-muted-foreground">
+              No companions yet. Add a plant or pet, or scan one with the camera.
+            </Card>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {plants.map((plant) => (
+                <PlantCard key={plant.id} plant={plant} onClick={() => openPlant(plant)} />
+              ))}
+            </div>
+          )}
         </section>
       </main>
 
@@ -197,9 +313,9 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
       <motion.button
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.94 }}
-        onClick={() => setScanOpen(true)}
+        onClick={openScanNew}
         className="fixed bottom-8 right-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_8px_24px_-8px_hsl(var(--primary)/0.6)] transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        aria-label="Scan a plant"
+        aria-label="Scan a plant or pet"
       >
         <ScanLine className="h-6 w-6" />
       </motion.button>
@@ -209,18 +325,23 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
         open={addOpen}
         onOpenChange={setAddOpen}
         onAdded={(name) => showToast(`${name} added to your garden`)}
-        onRequestScan={() => setScanOpen(true)}
+        onRequestScan={openScanNew}
       />
       <ScanDialog
         open={scanOpen}
-        onOpenChange={setScanOpen}
-        onScanned={(info) => showToast(`${info.name} added — ${info.message} (+${info.xp} XP)`)}
+        onOpenChange={(o) => {
+          setScanOpen(o);
+          if (!o) setScanTarget(null);
+        }}
+        target={scanTarget}
+        onScanned={(info) => showToast(`${info.name} — ${info.message} (+${info.xp} XP)`)}
       />
       <PlantDetailDialog
         plant={selectedPlant}
         open={detailOpen}
         onOpenChange={setDetailOpen}
         onCare={(message) => showToast(message)}
+        onHealthCheck={startHealthCheck}
       />
       <LeaderboardDialog open={leaderboardOpen} onOpenChange={setLeaderboardOpen} />
     </div>

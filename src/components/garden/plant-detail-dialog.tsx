@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Lock } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Camera, ImagePlus, Lock } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -20,12 +20,15 @@ import {
   CARE_ACTIONS_BY_KIND,
   CARE_META,
   careCooldownRemaining,
+  dailyCareNeeds,
   formatCooldown,
+  healthCheckDue,
   MINIGAME_CARE,
   STATUS_META,
   type CareType,
   type PlantVM,
 } from '@/lib/data';
+import { downscaleDataUrl, fileToDataUrl } from '@/lib/image';
 import { cn } from '@/lib/utils';
 
 interface PlantDetailDialogProps {
@@ -34,6 +37,8 @@ interface PlantDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Notify the host so it can surface a toast. */
   onCare?: (message: string) => void;
+  /** Asked when the user wants to take this week's photo health check. */
+  onHealthCheck?: (plant: PlantVM) => void;
 }
 
 function CareFact({ label, value }: { label: string; value: string }) {
@@ -52,9 +57,11 @@ export function PlantDetailDialog({
   open,
   onOpenChange,
   onCare,
+  onHealthCheck,
 }: PlantDetailDialogProps) {
-  const { plants, logCare, removePlant } = useGarden();
+  const { plants, logCare, removePlant, setPlantPhoto } = useGarden();
   const [game, setGame] = useState<CareType | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   if (!plant) return null;
 
@@ -65,6 +72,8 @@ export function PlantDetailDialog({
   const kind = live.kind ?? 'plant'; // default for any legacy record
   const actions = CARE_ACTIONS_BY_KIND[kind];
   const isPet = kind === 'pet';
+  const checkDue = healthCheckDue(live);
+  const needs = dailyCareNeeds(live, now);
 
   function doCare(type: CareType) {
     // Water and feeding are skill mini-games; anything else is an instant tap.
@@ -87,13 +96,36 @@ export function PlantDetailDialog({
     onCare?.(msg);
   }
 
+  async function onPhotoPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    try {
+      const raw = await fileToDataUrl(file);
+      const thumb = await downscaleDataUrl(raw, 400, 0.78);
+      setPlantPhoto(live.id, thumb);
+      onCare?.(`Photo added to ${live.name}`);
+    } catch {
+      onCare?.("That image couldn't be read — try another.");
+    }
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
             <div className="flex items-center gap-4">
-              <PlantAvatar name={live.name} kind={kind} className="h-14 w-14 text-lg" />
+              {live.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={live.photoUrl}
+                  alt={live.name}
+                  className="h-14 w-14 shrink-0 rounded-2xl object-cover"
+                />
+              ) : (
+                <PlantAvatar name={live.name} kind={kind} className="h-14 w-14 text-lg" />
+              )}
               <div className="min-w-0">
                 <DialogTitle>{live.name}</DialogTitle>
                 <DialogDescription className="italic">{live.species}</DialogDescription>
@@ -105,26 +137,67 @@ export function PlantDetailDialog({
           </DialogHeader>
 
           <div className="grid gap-4">
+            {/* ── HEALTH (from photo check-ins only) ── */}
             <div>
               <div className="mb-1.5 flex items-center justify-between text-sm">
                 <span className="font-bold text-foreground">Health</span>
                 <span className="text-muted-foreground">{live.healthScore}/100</span>
               </div>
               <ProgressBar value={live.healthScore} className="bg-primary" />
-              <span
-                className={cn(
-                  'mt-2 inline-block rounded-full px-2.5 py-1 text-xs font-bold',
-                  status.tone
-                )}
-              >
-                {status.label}
-              </span>
+              {checkDue ? (
+                <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-reward/40 bg-reward-soft/60 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-xs font-bold text-reward-foreground">
+                    Weekly health check due — snap a photo to update health.
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onHealthCheck?.(live);
+                    }}
+                  >
+                    <Camera className="h-4 w-4" />
+                    Take photo
+                  </Button>
+                </div>
+              ) : (
+                <span
+                  className={cn(
+                    'mt-2 inline-block rounded-full px-2.5 py-1 text-xs font-bold',
+                    status.tone
+                  )}
+                >
+                  {status.label} · checked this week
+                </span>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <CareFact label={isPet ? 'Water' : 'Water'} value={`${live.wateringIntervalDays}d`} />
-              <CareFact label={isPet ? 'Feed' : 'Feed'} value={`${live.fertilizingIntervalDays}d`} />
+              <CareFact label="Water" value={`${live.wateringIntervalDays}d`} />
+              <CareFact label="Feed" value={`${live.fertilizingIntervalDays}d`} />
               <CareFact label={isPet ? 'Type' : 'Light'} value={isPet ? 'Pet' : live.light} />
+            </div>
+
+            {/* ── TODAY'S CARE (exact amounts) ── */}
+            <div className="rounded-2xl border border-border bg-secondary/40 p-3">
+              <div className="mb-2 text-xs font-black uppercase tracking-wider text-muted-foreground">
+                What {live.name} needs
+              </div>
+              <ul className="space-y-1.5">
+                {needs.map((need) => {
+                  const due = need.dueInDays <= 0;
+                  return (
+                    <li key={need.type} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-bold text-foreground">{CARE_META[need.type].verb}</span>
+                      <span className={cn('text-right', due ? 'text-primary font-bold' : 'text-muted-foreground')}>
+                        {due
+                          ? `Today — ${need.amount}`
+                          : `in ${need.dueInDays} ${need.dueInDays === 1 ? 'day' : 'days'}`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
 
             <div
@@ -160,10 +233,15 @@ export function PlantDetailDialog({
               })}
             </div>
             <p className="text-center text-xs text-muted-foreground">
-              {isPet ? 'Care for your pet' : 'Care for your plant'} — but don&apos;t overdo it.
-              Each action rests for a while after you use it.
+              Caring earns XP and keeps your streak — it&apos;s your progress, not a
+              health score. Health only changes from the weekly photo check.
             </p>
-            <div className="pt-4 border-t border-border flex justify-end">
+
+            <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
+              <Button variant="outline" size="sm" onClick={() => photoInputRef.current?.click()}>
+                <ImagePlus className="h-4 w-4" />
+                {live.photoUrl ? 'Change photo' : 'Add photo'}
+              </Button>
               <Button
                 variant="destructive"
                 size="sm"
@@ -172,9 +250,17 @@ export function PlantDetailDialog({
                   onOpenChange(false);
                 }}
               >
-                Remove {isPet ? 'Pet' : 'Plant'}
+                Remove {isPet ? 'pet' : 'plant'}
               </Button>
             </div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              onChange={onPhotoPicked}
+            />
           </div>
         </DialogContent>
       </Dialog>
