@@ -53,7 +53,7 @@ export function PlantDetailDialog({
   onOpenChange,
   onCare,
 }: PlantDetailDialogProps) {
-  const { plants, logCare } = useGarden();
+  const { plants, logCare, removePlant } = useGarden();
   const [game, setGame] = useState<CareType | null>(null);
 
   if (!plant) return null;
@@ -163,6 +163,18 @@ export function PlantDetailDialog({
               {isPet ? 'Care for your pet' : 'Care for your plant'} — but don&apos;t overdo it.
               Each action rests for a while after you use it.
             </p>
+            <div className="pt-4 border-t border-border flex justify-end">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  removePlant(live.id);
+                  onOpenChange(false);
+                }}
+              >
+                Remove {isPet ? 'Pet' : 'Plant'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
