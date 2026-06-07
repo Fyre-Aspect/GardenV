@@ -43,6 +43,9 @@ export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager(),
   }),
+  // Optional view-model fields (e.g. a companion's photoUrl) are often absent;
+  // skip them on write rather than letting `undefined` reject the whole setDoc.
+  ignoreUndefinedProperties: true,
 });
 
 /** Analytics only runs in a supported browser context; never during SSR. */

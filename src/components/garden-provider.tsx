@@ -432,10 +432,11 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         fertilizingIntervalDays: input.fertilizingIntervalDays,
         light: input.light,
         lastCare: {},
-        photoUrl: input.photoUrl,
         // A photo at add-time counts as this week's health check; a text-only
-        // add (no photo) leaves the weekly check due so we prompt for one.
-        lastHealthCheckWeek: input.photoUrl ? weekKey() : undefined,
+        // add (no photo) leaves both fields off so the weekly check stays due.
+        ...(input.photoUrl
+          ? { photoUrl: input.photoUrl, lastHealthCheckWeek: weekKey() }
+          : {}),
       };
       setPlants((prev) => [...prev, plant]);
 
