@@ -17,7 +17,7 @@ const PlantScene = dynamic(() => import('@/components/plant-scene'), {
 });
 
 function SceneLoader() {
-  return (
+  return ( 
     <div
       className="flex h-full w-full items-center justify-center"
       role="status"

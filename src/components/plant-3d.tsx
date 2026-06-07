@@ -2,83 +2,177 @@
 
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 /**
- * The procedural plant: built entirely from three.js geometry — no model file.
- * It's laid out vertically so the page can scroll down it:
- *   flower (top, ~y +4) → stem + leaves (middle) → soil → roots (bottom, ~y -6).
- * The whole thing breathes with a slow sway unless reduced motion is requested.
+ * The landing-page plant. The body is a loaded model (red_rose.glb) that we
+ * auto-fit into the page's vertical layout; the roots below it stay procedural
+ * three.js tubes so the scroll story still ends in the soil.
+ *
+ * NOTE: red_rose.glb is ~38 MB (mostly textures), so first load is slow. If you
+ * want it snappier, re-export the model with smaller (≤1–2K) textures.
  */
 
-const STEM = '#2d5a27';
-const LEAF = '#3c7233';
-const PETAL = '#eab64c';
-const PETAL_CORE = '#995713';
-const ROOT = '#9a6b46';
+// Pale, de-saturated tone — real roots are closer to cream/tan than dark soil.
+const ROOT = '#cdb492';
 const SOIL = '#43301f';
 
-/** A simple leaf/petal outline (base at origin, tip up the +Y axis). */
-function leafShape() {
-  const s = new THREE.Shape();
-  s.moveTo(0, 0);
-  s.bezierCurveTo(0.34, 0.25, 0.3, 0.95, 0, 1.35);
-  s.bezierCurveTo(-0.3, 0.95, -0.34, 0.25, 0, 0);
-  return s;
+const ROSE_URL = '/red_rose.glb';
+/** Height (world units) to scale the rose to — spans the old stem→flower range. */
+const TARGET_HEIGHT = 6.5;
+/** Where the rose's base sits — the soil line, where the roots begin. */
+const BASE_Y = -2.5;
+
+/** Deterministic PRNG so the root system is stable across renders. */
+function mulberry32(seed: number) {
+  let a = seed;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-const LEAVES = [
-  { y: -0.4, side: 1, scale: 1.3, tilt: -0.2 },
-  { y: 0.6, side: -1, scale: 1.15, tilt: -0.25 },
-  { y: 1.7, side: 1, scale: 0.98, tilt: -0.3 },
-  { y: 2.5, side: -1, scale: 0.82, tilt: -0.32 },
-];
+/**
+ * A tube that tapers from `rBase` to `rTip` along a curve — three.js'
+ * `TubeGeometry` only does a constant radius, so we build it by hand to get
+ * roots that thin out to a point like real ones.
+ */
+function taperedTube(
+  points: THREE.Vector3[],
+  rBase: number,
+  rTip: number,
+  tubular = 40,
+  radial = 6
+) {
+  const curve = new THREE.CatmullRomCurve3(points);
+  const frames = curve.computeFrenetFrames(tubular, false);
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const P = new THREE.Vector3();
 
-const PETAL_COUNT = 8;
+  for (let i = 0; i <= tubular; i++) {
+    const t = i / tubular;
+    curve.getPointAt(t, P);
+    // Ease the radius so it stays sturdy near the base and whips to a fine tip.
+    const r = THREE.MathUtils.lerp(rBase, rTip, t * t);
+    const N = frames.normals[i];
+    const B = frames.binormals[i];
+    for (let j = 0; j <= radial; j++) {
+      const v = (j / radial) * Math.PI * 2;
+      const sin = Math.sin(v);
+      const cos = -Math.cos(v);
+      positions.push(
+        P.x + r * (cos * N.x + sin * B.x),
+        P.y + r * (cos * N.y + sin * B.y),
+        P.z + r * (cos * N.z + sin * B.z)
+      );
+    }
+  }
+  for (let i = 1; i <= tubular; i++) {
+    for (let j = 1; j <= radial; j++) {
+      const a = (radial + 1) * (i - 1) + (j - 1);
+      const b = (radial + 1) * i + (j - 1);
+      const c = (radial + 1) * i + j;
+      const d = (radial + 1) * (i - 1) + j;
+      indices.push(a, b, d, b, c, d);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
 
 export function Plant({ reducedMotion = false }: { reducedMotion?: boolean }) {
   const group = useRef<THREE.Group>(null);
+  const { scene } = useGLTF(ROSE_URL);
 
-  const stemGeo = useMemo(() => {
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, -2.6, 0),
-      new THREE.Vector3(0.18, -1.2, 0.05),
-      new THREE.Vector3(-0.14, 0.2, -0.05),
-      new THREE.Vector3(0.12, 1.6, 0.05),
-      new THREE.Vector3(0, 3.0, 0),
-      new THREE.Vector3(0, 3.8, 0),
-    ]);
-    return new THREE.TubeGeometry(curve, 80, 0.09, 10, false);
-  }, []);
-
-  const leafGeo = useMemo(() => new THREE.ShapeGeometry(leafShape(), 24), []);
+  // Clone (so the cached GLTF isn't mutated) and auto-fit: scale to TARGET_HEIGHT,
+  // centre on X/Z, and seat the base at BASE_Y regardless of the model's origin.
+  const rose = useMemo(() => {
+    const obj = scene.clone(true);
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const scale = TARGET_HEIGHT / (size.y || 1);
+    obj.scale.setScalar(scale);
+    obj.position.set(
+      -center.x * scale,
+      BASE_Y - box.min.y * scale,
+      -center.z * scale
+    );
+    return obj;
+  }, [scene]);
 
   const rootGeos = useMemo(() => {
-    const specs: [number, number][] = [
-      [0.05, -0.2],
-      [0.9, 0.3],
-      [-0.9, -0.3],
-      [0.5, -0.7],
-      [-0.5, 0.7],
-    ];
-    return specs.map(([dx, dz]) => {
-      const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, -2.5, 0),
-        new THREE.Vector3(dx * 0.5, -3.3, dz * 0.5),
-        new THREE.Vector3(dx * 1.1, -4.2, dz * 1.0),
-        new THREE.Vector3(dx * 1.5, -5.2, dz * 1.3),
-        new THREE.Vector3(dx * 1.7, -6.0, dz * 1.5),
-      ]);
-      return new THREE.TubeGeometry(curve, 60, 0.055, 8, false);
-    });
+    const rand = mulberry32(20240607);
+    const top = -2.5; // soil line
+    const geos: THREE.BufferGeometry[] = [];
+    const MAIN = 9;
+
+    for (let i = 0; i < MAIN; i++) {
+      const ang = (i / MAIN) * Math.PI * 2 + (rand() - 0.5) * 0.6;
+      const reach = 1.3 + rand() * 1.4; // horizontal spread
+      const depth = 5.5 + rand() * 2.5; // how far below the soil it dives
+      const dx = Math.cos(ang);
+      const dz = Math.sin(ang);
+      const sway = (rand() - 0.5) * 0.8;
+
+      const main = [
+        new THREE.Vector3(0, top + 0.1, 0),
+        new THREE.Vector3(dx * reach * 0.22, top - depth * 0.22, dz * reach * 0.22),
+        new THREE.Vector3(
+          dx * reach * 0.6 + sway,
+          top - depth * 0.55,
+          dz * reach * 0.6 + sway
+        ),
+        new THREE.Vector3(dx * reach * 0.95, top - depth * 0.82, dz * reach * 0.95),
+        new THREE.Vector3(dx * reach * 1.1, top - depth, dz * reach * 1.1),
+      ];
+      const rBase = 0.07 + rand() * 0.035;
+      geos.push(taperedTube(main, rBase, 0.006, 48, 7));
+
+      // Finer secondary roots branching off the main one.
+      const mainCurve = new THREE.CatmullRomCurve3(main);
+      const branches = 1 + Math.floor(rand() * 3);
+      for (let b = 0; b < branches; b++) {
+        const tStart = 0.35 + rand() * 0.4;
+        const start = mainCurve.getPointAt(tStart);
+        const bAng = ang + (rand() - 0.5) * 1.6;
+        const bReach = 0.5 + rand() * 0.9;
+        const bDepth = 1.2 + rand() * 1.8;
+        const bx = Math.cos(bAng);
+        const bz = Math.sin(bAng);
+        const branch = [
+          start.clone(),
+          new THREE.Vector3(
+            start.x + bx * bReach * 0.5,
+            start.y - bDepth * 0.55,
+            start.z + bz * bReach * 0.5
+          ),
+          new THREE.Vector3(
+            start.x + bx * bReach,
+            start.y - bDepth,
+            start.z + bz * bReach
+          ),
+        ];
+        geos.push(taperedTube(branch, rBase * 0.45, 0.004, 28, 6));
+      }
+    }
+    return geos;
   }, []);
 
-  // Dispose generated geometries on unmount (R3F handles materials/meshes).
+  // Dispose generated root geometries on unmount (R3F handles the model).
   useMemo(() => () => {
-    stemGeo.dispose();
-    leafGeo.dispose();
     rootGeos.forEach((g) => g.dispose());
-  }, [stemGeo, leafGeo, rootGeos]);
+  }, [rootGeos]);
 
   useFrame((state) => {
     if (reducedMotion || !group.current) return;
@@ -89,41 +183,8 @@ export function Plant({ reducedMotion = false }: { reducedMotion?: boolean }) {
 
   return (
     <group ref={group}>
-      {/* Stem */}
-      <mesh geometry={stemGeo}>
-        <meshStandardMaterial color={STEM} roughness={0.7} />
-      </mesh>
-
-      {/* Leaves */}
-      {LEAVES.map((l, i) => (
-        <mesh
-          key={i}
-          geometry={leafGeo}
-          position={[l.side * 0.06, l.y, 0]}
-          rotation={[l.tilt, l.side * 0.5, l.side * -0.7]}
-          scale={l.scale}
-        >
-          <meshStandardMaterial color={LEAF} roughness={0.6} side={THREE.DoubleSide} />
-        </mesh>
-      ))}
-
-      {/* Flower — petals radiate in a plane tilted up toward the viewer. */}
-      <group position={[0, 4.15, 0]} rotation={[-0.45, 0, 0]}>
-        {Array.from({ length: PETAL_COUNT }).map((_, i) => (
-          <mesh
-            key={i}
-            geometry={leafGeo}
-            rotation={[0, 0, (i / PETAL_COUNT) * Math.PI * 2]}
-            scale={0.62}
-          >
-            <meshStandardMaterial color={PETAL} roughness={0.5} side={THREE.DoubleSide} />
-          </mesh>
-        ))}
-        <mesh>
-          <sphereGeometry args={[0.3, 24, 24]} />
-          <meshStandardMaterial color={PETAL_CORE} roughness={0.85} />
-        </mesh>
-      </group>
+      {/* Rose model (stem + bloom) */}
+      <primitive object={rose} />
 
       {/* Soil */}
       <mesh position={[0, -2.62, 0]}>
@@ -140,3 +201,5 @@ export function Plant({ reducedMotion = false }: { reducedMotion?: boolean }) {
     </group>
   );
 }
+
+useGLTF.preload(ROSE_URL);

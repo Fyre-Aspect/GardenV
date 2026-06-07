@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ScrollControls, Scroll, useScroll } from '@react-three/drei';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -67,7 +67,11 @@ export default function PlantScene({ onStart }: PlantSceneProps) {
 
       <ScrollControls pages={PAGES} damping={0.28}>
         <CameraRig />
-        <Plant reducedMotion={reduce} />
+        {/* The rose model loads async; suspend just the model so the scroll
+            copy stays visible while the (large) GLB downloads. */}
+        <Suspense fallback={null}>
+          <Plant reducedMotion={reduce} />
+        </Suspense>
 
         <Scroll html>
           <SceneCopy onStart={onStart} />
