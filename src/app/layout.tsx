@@ -17,7 +17,13 @@ export const metadata: Metadata = {
     'Kindred helps you remember what each plant needs and turns daily care into a habit worth keeping.',
   manifest: '/manifest.json',
   applicationName: 'Kindred',
-  icons: { apple: '/logo192.png' },
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: '48x48' },
+    ],
+    apple: '/logo192.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

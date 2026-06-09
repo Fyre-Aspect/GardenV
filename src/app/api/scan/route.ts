@@ -121,8 +121,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: overloaded
-          ? 'The plant scanner is busy right now. Please try again in a moment.'
-          : 'The plant scan failed. Please try again.',
+          ? 'Kindred is catching its breath right now. Give it a moment and try again.'
+          : "Your companion's reading didn't come through. Try again.",
       },
       { status: overloaded ? 503 : 502 }
     );

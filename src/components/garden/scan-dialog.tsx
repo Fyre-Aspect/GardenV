@@ -127,7 +127,7 @@ export function ScanDialog({ open, onOpenChange, onScanned, target }: ScanDialog
 
         if (!res.detected) {
           setErrorMsg(
-            "I couldn't spot a plant or pet in that photo. Try again with the subject filling the frame."
+            "These leaves weren't recognized. Fill the frame with your plant or pet and give it another go."
           );
           setPhase('error');
           return;
@@ -170,7 +170,7 @@ export function ScanDialog({ open, onOpenChange, onScanned, target }: ScanDialog
       } catch (err) {
         console.error('[scan] analysis failed', err);
         setErrorMsg(
-          'The scan couldn’t finish. Check that you’re online and that Firebase AI Logic is enabled, then try again.'
+          "Your companion's reading didn't come through. Make sure you're connected and try again."
         );
         setPhase('error');
       }
@@ -222,9 +222,9 @@ export function ScanDialog({ open, onOpenChange, onScanned, target }: ScanDialog
               (isHealthCheck
                 ? `Take a fresh photo of ${target!.name} for this week's health check.`
                 : 'Point your camera at a plant or pet and capture a photo for an instant AI health check.')}
-            {phase === 'analyzing' && 'Identifying your companion and checking its health…'}
-            {phase === 'result' && 'Here’s what the scan found.'}
-            {phase === 'error' && 'Let’s try that again.'}
+            {phase === 'analyzing' && "Reading your companion and checking in on its health..."}
+            {phase === 'result' && "Here is what Kindred found."}
+            {phase === 'error' && "No worries, let us give it another try."}
           </DialogDescription>
         </DialogHeader>
 
@@ -281,7 +281,7 @@ export function ScanDialog({ open, onOpenChange, onScanned, target }: ScanDialog
             <ScanFrame reduce={!!reduce} />
             <div className="absolute inset-x-0 bottom-5 flex items-center justify-center gap-2 text-sm font-bold text-white drop-shadow">
               <Leaf className="h-4 w-4 animate-pulse" />
-              Analysing your plant…
+              Reading your companion…
             </div>
           </div>
         )}
