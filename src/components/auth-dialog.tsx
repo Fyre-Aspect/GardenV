@@ -128,7 +128,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           <DialogDescription>
             {mode === 'signin'
               ? 'Sign in to tend your plants and keep your streak alive.'
-              : 'Sign up to start growing — it only takes a moment.'}
+              : 'Sign up to start growing, it only takes a moment.'}
           </DialogDescription>
         </DialogHeader>
 

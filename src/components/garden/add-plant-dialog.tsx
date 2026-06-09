@@ -92,7 +92,7 @@ export function AddPlantDialog({
         // Too vague (e.g. "dog") — ask for a photo to identify accurately.
         setNeedPhoto(
           result.reason ||
-            `“${species.trim() || name.trim()}” isn’t specific enough — a photo helps me identify it and check its health.`
+            `“${species.trim() || name.trim()}” isn’t specific enough, a photo helps me identify it and check its health.`
         );
         setPending(false);
       }
@@ -161,7 +161,7 @@ export function AddPlantDialog({
             <DialogHeader>
               <DialogTitle>Add to your garden</DialogTitle>
               <DialogDescription>
-                Add a plant or a pet — we’ll identify it and start tracking its care.
+                Add a plant or a pet, we’ll identify it and start tracking its care.
               </DialogDescription>
             </DialogHeader>
 

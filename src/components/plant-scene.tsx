@@ -116,11 +116,11 @@ function SceneCopy({ onStart }: PlantSceneProps) {
             <span className="text-primary">you&apos;re proud of.</span>
           </h1>
           <p className="mx-auto mb-6 max-w-sm leading-relaxed text-muted-foreground">
-            Start at the bloom. Scroll down and follow the whole story — leaf by
+            Start at the bloom. Scroll down and follow the whole story, leaf by
             leaf, all the way to the roots of why we built this.
           </p>
           <Button size="lg" onClick={onStart}>
-            Start growing — it&apos;s free
+            Start growing, it&apos;s free
             <ArrowRight className="h-4 w-4" />
           </Button>
         </Panel>
@@ -135,7 +135,7 @@ function SceneCopy({ onStart }: PlantSceneProps) {
           </h2>
           <p className="leading-relaxed text-muted-foreground">
             Add every plant and pet you care for, and let Kindred hold every
-            watering, feeding and care schedule for you — so nothing slips
+            watering, feeding and care schedule for you, so nothing slips
             through a busy week.
           </p>
         </Panel>
@@ -164,7 +164,7 @@ function SceneCopy({ onStart }: PlantSceneProps) {
             Why we built Kindred
           </h2>
           <p className="mx-auto mb-6 max-w-sm leading-relaxed text-muted-foreground">
-            Most plants don&apos;t die from neglect — they die from being
+            Most plants don&apos;t die from neglect, they die from being
             forgotten. Kindred is the gentle, rewarding nudge we wished we had:
             rooted in routine, growing right alongside you.
           </p>
@@ -188,7 +188,7 @@ function SceneCopy({ onStart }: PlantSceneProps) {
             ))}
           </div>
           <Button size="lg" onClick={onStart} className="w-full">
-            Start your garden — it&apos;s free
+            Start your garden, it&apos;s free
             <ArrowRight className="h-4 w-4" />
           </Button>
         </Panel>
@@ -200,7 +200,7 @@ function SceneCopy({ onStart }: PlantSceneProps) {
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Is Kindred free?',
-    a: 'Yes — create an account and start growing at no cost.',
+    a: 'Yes, create an account and start growing at no cost.',
   },
   {
     q: 'How does the plant scan work?',
@@ -208,7 +208,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Do I need to install anything?',
-    a: 'No. It runs right in your browser — and because it’s a PWA, you can add it to your home screen to use it like a native app.',
+    a: 'No. It runs right in your browser, and because it’s a PWA, you can add it to your home screen to use it like a native app.',
   },
   {
     q: 'Does it work offline?',
@@ -216,7 +216,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Is my data private?',
-    a: 'Every garden is stored privately under your own account — only you can see or change it.',
+    a: 'Every garden is stored privately under your own account, only you can see or change it.',
   },
   {
     q: 'What if I miss a day?',

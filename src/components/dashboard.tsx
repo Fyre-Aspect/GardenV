@@ -143,7 +143,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
                 'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black transition-opacity hover:opacity-80',
                 league.badge
               )}
-              aria-label={`${league.name} league — view leaderboard`}
+              aria-label={`${league.name} league, view leaderboard`}
             >
               <Trophy className="h-3.5 w-3.5" aria-hidden />
               <span className="hidden sm:inline">{league.name}</span>
@@ -203,7 +203,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
           <div className="min-w-0 flex-1">
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-sm font-black text-foreground">
-                Level {progress.level} — Green Thumb
+                Level {progress.level}: Green Thumb
               </span>
               <span className="text-xs text-muted-foreground">
                 {progress.xpIntoLevel}/{progress.xpForNext} XP
@@ -256,7 +256,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
           <SectionHeader title="Today's care" />
           {allCaredFor ? (
             <Card className="border-border p-6 text-center text-sm text-muted-foreground">
-              Nothing due today — your companions are all set.
+              Nothing due today, your companions are all set.
             </Card>
           ) : (
             <div className="space-y-3">
@@ -335,7 +335,7 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
           if (!o) setScanTarget(null);
         }}
         target={scanTarget}
-        onScanned={(info) => showToast(`${info.name} — ${info.message} (+${info.xp} XP)`)}
+        onScanned={(info) => showToast(`${info.name}: ${info.message} (+${info.xp} XP)`)}
       />
       <PlantDetailDialog
         plant={selectedPlant}

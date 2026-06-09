@@ -116,7 +116,7 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
         <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
           {merged.length === 0 && (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              No XP earned yet this week. Be the first — go care for something!
+              No XP earned yet this week. Be the first, go care for something!
             </p>
           )}
           {merged.map((e, i) => {

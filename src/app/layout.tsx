@@ -12,7 +12,7 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: 'Kindred — Care for your plants, every day',
+  title: 'Kindred: Care for your plants, every day',
   description:
     'Kindred helps you remember what each plant needs and turns daily care into a habit worth keeping.',
   manifest: '/manifest.json',

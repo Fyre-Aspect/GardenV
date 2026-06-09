@@ -19,7 +19,7 @@ function headline(streak: number): { eyebrow: string; title: string; note: strin
     return {
       eyebrow: 'Perfect week',
       title: '7-day streak!',
-      note: 'Seven days in a row — your companions are flourishing.',
+      note: 'Seven days in a row, your companions are flourishing.',
     };
   if (streak >= 100)
     return {

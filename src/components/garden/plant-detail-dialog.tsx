@@ -91,7 +91,7 @@ export function PlantDetailDialog({
     const verb = CARE_META[game].verb;
     const msg =
       verdict === 'overflow'
-        ? `You overdid it on ${live.name} — go easy next time!`
+        ? `You overdid it on ${live.name}, go easy next time!`
         : `${verb} ${live.name}${xp > 0 ? ` · +${xp} XP` : ''}`;
     onCare?.(msg);
   }
@@ -106,7 +106,7 @@ export function PlantDetailDialog({
       setPlantPhoto(live.id, thumb);
       onCare?.(`Photo added to ${live.name}`);
     } catch {
-      onCare?.("That image couldn't be read — try another.");
+      onCare?.("That image couldn't be read. Try another.");
     }
   }
 
@@ -147,7 +147,7 @@ export function PlantDetailDialog({
               {checkDue ? (
                 <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-reward/40 bg-reward-soft/60 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-xs font-bold text-reward-foreground">
-                    Weekly health check due — snap a photo to update health.
+                    Weekly health check due, snap a photo to update health.
                   </span>
                   <Button
                     size="sm"
@@ -191,7 +191,7 @@ export function PlantDetailDialog({
                       <span className="font-bold text-foreground">{CARE_META[need.type].verb}</span>
                       <span className={cn('text-right', due ? 'text-primary font-bold' : 'text-muted-foreground')}>
                         {due
-                          ? `Today — ${need.amount}`
+                          ? `Today: ${need.amount}`
                           : `in ${need.dueInDays} ${need.dueInDays === 1 ? 'day' : 'days'}`}
                       </span>
                     </li>
@@ -216,7 +216,7 @@ export function PlantDetailDialog({
                     variant="secondary"
                     disabled={locked}
                     onClick={() => doCare(type)}
-                    title={locked ? `Recently done — ready in ${formatCooldown(remaining)}` : undefined}
+                    title={locked ? `Recently done, ready in ${formatCooldown(remaining)}` : undefined}
                     className="flex-col gap-1 py-2 h-auto min-h-[3.5rem]"
                   >
                     <span className="flex items-center gap-1.5">
@@ -233,7 +233,7 @@ export function PlantDetailDialog({
               })}
             </div>
             <p className="text-center text-xs text-muted-foreground">
-              Caring earns XP and keeps your streak — it&apos;s your progress, not a
+              Caring earns XP and keeps your streak, it&apos;s your progress, not a
               health score. Health only changes from the weekly photo check.
             </p>
 

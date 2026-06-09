@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     console.error('[api/identify] Gemini call failed', detail);
     const overloaded = /503|overload|UNAVAILABLE|high demand/i.test(detail);
     return NextResponse.json(
-      { error: overloaded ? 'The identifier is busy — try again in a moment.' : 'Identification failed.' },
+      { error: overloaded ? 'The identifier is busy. Try again in a moment.' : 'Identification failed.' },
       { status: overloaded ? 503 : 502 }
     );
   }

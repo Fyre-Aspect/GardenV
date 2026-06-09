@@ -62,9 +62,9 @@ const COPY: Record<
     fill: 'from-sky-500/80 to-sky-400/70',
     verdicts: {
       perfect: { title: 'Perfectly watered!', note: 'Right in the sweet spot. Lovely pour.', good: true },
-      much: { title: 'A touch much', note: 'Just over — ease off a hair next time.', good: true },
-      short: { title: 'A little light', note: 'Not quite enough — give a bit more next time.', good: false },
-      overflow: { title: 'Whoa — overwatered!', note: 'You drowned it. Go gently on the pour.', good: false },
+      much: { title: 'A touch much', note: 'Just over, ease off a hair next time.', good: true },
+      short: { title: 'A little light', note: 'Not quite enough, give a bit more next time.', good: false },
+      overflow: { title: 'Whoa, overwatered!', note: 'You drowned it. Go gently on the pour.', good: false },
     },
   },
   food: {
@@ -72,9 +72,9 @@ const COPY: Record<
     fill: 'from-amber-500/80 to-amber-400/70',
     verdicts: {
       perfect: { title: 'Perfect portion!', note: 'Exactly the right amount. Well judged.', good: true },
-      much: { title: 'A bit generous', note: 'Slightly too much — scale back next time.', good: true },
-      short: { title: 'A small serving', note: 'A little light — a touch more next time.', good: false },
-      overflow: { title: 'Too much food!', note: 'Don’t overfeed — that does more harm than good.', good: false },
+      much: { title: 'A bit generous', note: 'Slightly too much, scale back next time.', good: true },
+      short: { title: 'A small serving', note: 'A little light, a touch more next time.', good: false },
+      overflow: { title: 'Too much food!', note: 'Don’t overfeed, that does more harm than good.', good: false },
     },
   },
 };
@@ -182,7 +182,7 @@ export function CareGame({
           <DialogDescription>
             {done
               ? 'Here’s how you did.'
-              : `${copy.hold} — release when it reaches the green zone.`}
+              : `${copy.hold}. Release when it reaches the green zone.`}
           </DialogDescription>
         </DialogHeader>
 
