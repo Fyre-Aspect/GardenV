@@ -2,13 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bell, Camera, Leaf, Plus, ScanLine, Trophy } from 'lucide-react';
+import { Bell, Camera, Leaf, Plus, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useGarden } from '@/components/garden-provider';
 import { SectionHeader } from '@/components/garden/section-header';
 import { StreakDots } from '@/components/garden/streak-dots';
-import { ProgressBar } from '@/components/garden/progress-bar';
 import { PlantCard } from '@/components/garden/plant-card';
 import { PlantAvatar } from '@/components/garden/plant-avatar';
 import { Toast, type ToastState } from '@/components/garden/toast';
@@ -17,7 +16,8 @@ import { ScanDialog } from '@/components/garden/scan-dialog';
 import { PlantDetailDialog } from '@/components/garden/plant-detail-dialog';
 import { LevelUpCelebration } from '@/components/garden/level-up-celebration';
 import { MilestoneCelebration } from '@/components/garden/milestone-celebration';
-import { LeaderboardDialog } from '@/components/garden/leaderboard-dialog';
+import { PlantLeaderboard } from '@/components/garden/plant-leaderboard';
+import { StreakLeaderboard } from '@/components/garden/streak-leaderboard';
 import {
   CARE_META,
   dailyCareNeeds,
@@ -26,7 +26,6 @@ import {
   type CareNeed,
   type PlantVM,
 } from '@/lib/data';
-import { cn } from '@/lib/utils';
 
 interface DashboardProps {
   onSignOut: () => void;
@@ -38,7 +37,7 @@ interface DueCareItem {
 }
 
 export default function Dashboard({ onSignOut }: DashboardProps) {
-  const { plants, streak, progress, league } = useGarden();
+  const { plants, streak } = useGarden();
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
@@ -48,7 +47,6 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
   const [scanTarget, setScanTarget] = useState<PlantVM | null>(null);
   const [selectedPlant, setSelectedPlant] = useState<PlantVM | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | 'unsupported'>('unsupported');
 
   function showToast(message: string, action?: { label: string; fn: () => void }) {
@@ -88,7 +86,6 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
   const checkDue = useMemo(() => plants.filter((p) => healthCheckDue(p)), [plants]);
   const dueNames = checkDue.map((p) => p.name).join(', ');
   const allCaredFor = careItems.length === 0;
-  const xpPct = (progress.xpIntoLevel / progress.xpForNext) * 100;
 
   // Detect notification support / permission on mount.
   useEffect(() => {
@@ -131,34 +128,17 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
 
       {/* ── HEADER ── */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
             <Leaf className="h-5 w-5 text-primary" />
             <span className="font-black tracking-tight text-foreground">Kindred</span>
           </div>
-          <div className="flex items-center gap-3 sm:gap-4">
-            <button
-              onClick={() => setLeaderboardOpen(true)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black transition-opacity hover:opacity-80',
-                league.badge
-              )}
-              aria-label={`${league.name} league, view leaderboard`}
-            >
-              <Trophy className="h-3.5 w-3.5" aria-hidden />
-              <span className="hidden sm:inline">{league.name}</span>
-            </button>
+          <div className="flex items-center gap-4">
             <div className="text-sm font-bold text-foreground" aria-label={`${streak} day streak`}>
               {streak}
               <span className="ml-1 font-medium text-muted-foreground">
                 day{streak === 1 ? '' : 's'}
               </span>
-            </div>
-            <div
-              className="text-sm font-bold text-foreground"
-              aria-label={`${progress.xpIntoLevel} XP toward level ${progress.level + 1}`}
-            >
-              {progress.xpIntoLevel} XP
             </div>
             <button
               onClick={onSignOut}
@@ -168,154 +148,149 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
             </button>
           </div>
         </div>
-        <ProgressBar value={xpPct} className="rounded-none" trackClassName="h-1 rounded-none bg-secondary" />
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 pb-28 pt-8">
-        {/* ── WELCOME ── */}
-        <Card className="mb-6 border-border p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-foreground">
-                Good morning, Gardener
-              </h1>
-              <p className="mt-1 text-muted-foreground">
-                {allCaredFor
-                  ? 'All cared for today. Nicely kept.'
-                  : `${careItems.length} ${careItems.length === 1 ? 'thing' : 'things'} need attention today.`}
-              </p>
-            </div>
-            <div className="flex shrink-0 flex-col items-center justify-center rounded-2xl border border-border bg-secondary/50 px-5 py-3">
-              <div className="text-2xl font-black leading-none text-foreground">{streak}</div>
-              <div className="mt-1 text-xs font-medium text-muted-foreground">
-                day{streak === 1 ? '' : 's'} streak
-              </div>
-            </div>
-          </div>
-          <StreakDots filled={Math.min(streak, 7)} className="mt-5" />
-        </Card>
+      {/* ── BODY: rails (desktop) / stacked boards above garden (mobile) ── */}
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:flex-row lg:items-start">
+        {/* LEFT rail — weekly plant-level board */}
+        <aside className="order-1 lg:sticky lg:top-20 lg:w-64 lg:shrink-0">
+          <PlantLeaderboard />
+        </aside>
 
-        {/* ── LEVEL ── */}
-        <Card className="mb-8 flex items-center gap-4 border-border bg-secondary/40 p-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">
-            {progress.level}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-sm font-black text-foreground">
-                Level {progress.level}: Green Thumb
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {progress.xpIntoLevel}/{progress.xpForNext} XP
-              </span>
-            </div>
-            <ProgressBar value={xpPct} />
-          </div>
-        </Card>
-
-        {/* ── WEEKLY HEALTH CHECK ── */}
-        {checkDue.length > 0 && (
-          <Card className="mb-8 border-reward/30 bg-reward-soft/40 p-5">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-reward/15 text-reward">
-                <Camera className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-black text-foreground">Weekly health check</div>
-                <p className="text-sm text-muted-foreground">
-                  Health is judged from photos, not watering. Snap a fresh picture to update it.
+        {/* CENTER — the garden */}
+        <main className="order-3 min-w-0 flex-1 pb-20 lg:order-2">
+          {/* ── WELCOME ── */}
+          <Card className="mb-6 border-border p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-foreground">
+                  Good morning, Gardener
+                </h1>
+                <p className="mt-1 text-muted-foreground">
+                  {allCaredFor
+                    ? 'All cared for today. Nicely kept.'
+                    : `${careItems.length} ${careItems.length === 1 ? 'thing' : 'things'} need attention today.`}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {checkDue.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => startHealthCheck(p)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-reward/40 bg-background px-3 py-1.5 text-sm font-bold text-foreground transition-colors hover:bg-reward-soft"
-                    >
-                      <Camera className="h-3.5 w-3.5 text-reward" />
-                      {p.name}
-                    </button>
-                  ))}
+              </div>
+              <div className="flex shrink-0 flex-col items-center justify-center rounded-2xl border border-border bg-secondary/50 px-5 py-3">
+                <div className="text-2xl font-black leading-none text-foreground">{streak}</div>
+                <div className="mt-1 text-xs font-medium text-muted-foreground">
+                  day{streak === 1 ? '' : 's'} streak
                 </div>
-                {notifPerm === 'default' && (
-                  <button
-                    onClick={enableReminders}
-                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-reward-foreground/80 transition-colors hover:text-reward-foreground"
-                  >
-                    <Bell className="h-3.5 w-3.5" />
-                    Turn on weekly reminders
-                  </button>
-                )}
               </div>
             </div>
+            <StreakDots filled={Math.min(streak, 7)} className="mt-5" />
           </Card>
-        )}
 
-        {/* ── TODAY'S CARE (exact amounts) ── */}
-        <section className="mb-10">
-          <SectionHeader title="Today's care" />
-          {allCaredFor ? (
-            <Card className="border-border p-6 text-center text-sm text-muted-foreground">
-              Nothing due today, your companions are all set.
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {careItems.map(({ plant, need }) => (
-                <button
-                  key={`${plant.id}-${need.type}`}
-                  onClick={() => openPlant(plant)}
-                  className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-primary/30"
-                >
-                  {plant.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={plant.photoUrl}
-                      alt={plant.name}
-                      className="h-11 w-11 shrink-0 rounded-xl object-cover"
-                    />
-                  ) : (
-                    <PlantAvatar name={plant.name} kind={plant.kind} className="h-11 w-11 text-sm" />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="font-black text-foreground">
-                      {CARE_META[need.type].verb} {plant.name}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Give {need.amount}</div>
+          {/* ── WEEKLY HEALTH CHECK ── */}
+          {checkDue.length > 0 && (
+            <Card className="mb-8 border-reward/30 bg-reward-soft/40 p-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-reward/15 text-reward">
+                  <Camera className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-black text-foreground">Weekly health check</div>
+                  <p className="text-sm text-muted-foreground">
+                    Health is judged from photos, not watering. Snap a fresh picture to update it.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {checkDue.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => startHealthCheck(p)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-reward/40 bg-background px-3 py-1.5 text-sm font-bold text-foreground transition-colors hover:bg-reward-soft"
+                      >
+                        <Camera className="h-3.5 w-3.5 text-reward" />
+                        {p.name}
+                      </button>
+                    ))}
                   </div>
-                  <span className="shrink-0 text-sm font-bold text-primary">Care →</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ── GARDEN ── */}
-        <section>
-          <SectionHeader title="My garden">
-            <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4" /> Add
-            </Button>
-          </SectionHeader>
-          {plants.length === 0 ? (
-            <Card className="border-border p-8 text-center text-sm text-muted-foreground">
-              No companions yet. Add a plant or pet, or scan one with the camera.
+                  {notifPerm === 'default' && (
+                    <button
+                      onClick={enableReminders}
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-reward-foreground/80 transition-colors hover:text-reward-foreground"
+                    >
+                      <Bell className="h-3.5 w-3.5" />
+                      Turn on weekly reminders
+                    </button>
+                  )}
+                </div>
+              </div>
             </Card>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {plants.map((plant) => (
-                <PlantCard key={plant.id} plant={plant} onClick={() => openPlant(plant)} />
-              ))}
-            </div>
           )}
-        </section>
-      </main>
+
+          {/* ── TODAY'S CARE (exact amounts) ── */}
+          <section className="mb-10">
+            <SectionHeader title="Today's care" />
+            {allCaredFor ? (
+              <Card className="border-border p-6 text-center text-sm text-muted-foreground">
+                Nothing due today, your companions are all set.
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {careItems.map(({ plant, need }) => (
+                  <button
+                    key={`${plant.id}-${need.type}`}
+                    onClick={() => openPlant(plant)}
+                    className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition-colors hover:border-primary/30"
+                  >
+                    {plant.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={plant.photoUrl}
+                        alt={plant.name}
+                        className="h-11 w-11 shrink-0 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <PlantAvatar name={plant.name} kind={plant.kind} className="h-11 w-11 text-sm" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-black text-foreground">
+                        {CARE_META[need.type].verb} {plant.name}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Give {need.amount}</div>
+                    </div>
+                    <span className="shrink-0 text-sm font-bold text-primary">Care →</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ── GARDEN ── */}
+          <section>
+            <SectionHeader title="My garden">
+              <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            </SectionHeader>
+            {plants.length === 0 ? (
+              <Card className="border-border p-8 text-center text-sm text-muted-foreground">
+                No companions yet. Add a plant or pet, or scan one with the camera.
+              </Card>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
+                {plants.map((plant) => (
+                  <PlantCard key={plant.id} plant={plant} onClick={() => openPlant(plant)} />
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+
+        {/* RIGHT rail — streak board */}
+        <aside className="order-2 lg:order-3 lg:sticky lg:top-20 lg:w-64 lg:shrink-0">
+          <StreakLeaderboard />
+        </aside>
+      </div>
 
       {/* ── SCAN FAB ── */}
       <motion.button
         whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.94 }}
         onClick={openScanNew}
-        className="fixed bottom-8 right-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_8px_24px_-8px_hsl(var(--primary)/0.6)] transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="fixed bottom-8 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_8px_24px_-8px_hsl(var(--primary)/0.6)] transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         aria-label="Scan a plant or pet"
       >
         <ScanLine className="h-6 w-6" />
@@ -344,7 +319,6 @@ export default function Dashboard({ onSignOut }: DashboardProps) {
         onCare={(message) => showToast(message)}
         onHealthCheck={startHealthCheck}
       />
-      <LeaderboardDialog open={leaderboardOpen} onOpenChange={setLeaderboardOpen} />
     </div>
   );
 }

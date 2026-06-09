@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 
 /**
  * Tasteful level-up moment. A soft scrim + card with a single restrained accent
- * burst — celebratory but not confetti spam. Triggered by the provider's
- * `justLeveledUp` flag and dismissed back through it.
+ * burst — celebratory but not confetti spam. Triggered when a plant levels up
+ * (the provider's `justLeveledUp`) and dismissed back through it.
  */
 export function LevelUpCelebration() {
   const { justLeveledUp, acknowledgeLevelUp } = useGarden();
@@ -31,7 +31,7 @@ export function LevelUpCelebration() {
           />
           <motion.div
             role="dialog"
-            aria-label={`Level ${justLeveledUp} reached`}
+            aria-label={`${justLeveledUp?.name} reached level ${justLeveledUp?.level}`}
             initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.9, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
@@ -62,10 +62,10 @@ export function LevelUpCelebration() {
               Level up
             </div>
             <div className="mt-1 text-3xl font-black tracking-tight text-foreground">
-              Level {justLeveledUp}
+              {justLeveledUp?.name} · Lv.{justLeveledUp?.level}
             </div>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Your green thumb is growing. Keep the streak alive.
+              Thriving care is paying off. Keep it above 90% to keep climbing.
             </p>
 
             <Button className="mt-6 w-full" onClick={acknowledgeLevelUp}>

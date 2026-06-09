@@ -18,7 +18,12 @@ export interface PlantVM {
   name: string;
   species: string;
   kind: Kind;
+  /** Display level for this week, derived from `weeklyXp` (see `plantLevel`). */
   level: number;
+  /** XP this companion has earned toward its level this week (resets Mondays). */
+  weeklyXp?: number;
+  /** weekKey the `weeklyXp` belongs to; a mismatch means it has reset to 0. */
+  levelWeek?: string;
   status: PlantStatus;
   healthScore: number; // 0–100
   wateringIntervalDays: number;
@@ -47,38 +52,40 @@ export interface TaskVM {
   xp: number;
 }
 
-// ── Gamification constants ────────────────────────────────────────────────
-export const STARTING_XP = 240;
-export const STARTING_LEVEL = 4;
-export const STARTING_STREAK = 7;
+// ── Plant leveling (per-plant, resets every week) ──────────────────────────
+// XP no longer belongs to the user. Each plant or pet earns XP from the care
+// you give it and levels up on its own — but only while it's thriving. Care for
+// a neglected (< 90% health) companion still keeps your streak, it just doesn't
+// move its level. Levels reset every Monday so each week is a fresh race.
 
-/** XP needed to advance from a given level. Gently scales so it always feels reachable. */
-export function xpForLevel(level: number): number {
-  return 200 + level * 50;
+/** A companion must be at least this healthy for care to count toward leveling. */
+export const HEALTHY_LEVEL_MIN = 90;
+
+/** XP to advance a plant from `level` to the next. Gentle so a week of care climbs a few. */
+export function plantXpForLevel(level: number): number {
+  return 40 + level * 20;
 }
 
-export interface Progress {
+export interface PlantProgress {
   level: number;
   xpIntoLevel: number;
   xpForNext: number;
 }
 
-/** Derive level + within-level progress from a single cumulative XP total. */
-export function deriveProgress(totalXp: number): Progress {
+/** Derive a plant's level + within-level progress from its XP earned this week. */
+export function plantProgress(weeklyXp: number): PlantProgress {
   let level = 1;
-  let into = Math.max(0, Math.floor(totalXp));
-  while (into >= xpForLevel(level)) {
-    into -= xpForLevel(level);
+  let into = Math.max(0, Math.floor(weeklyXp));
+  while (into >= plantXpForLevel(level)) {
+    into -= plantXpForLevel(level);
     level += 1;
   }
-  return { level, xpIntoLevel: into, xpForNext: xpForLevel(level) };
+  return { level, xpIntoLevel: into, xpForNext: plantXpForLevel(level) };
 }
 
-/** Cumulative XP that corresponds to the starting level + within-level XP. */
-export function initialTotalXp(): number {
-  let total = STARTING_XP;
-  for (let l = 1; l < STARTING_LEVEL; l++) total += xpForLevel(l);
-  return total;
+/** A plant's current level from its XP earned this week. */
+export function plantLevel(weeklyXp: number): number {
+  return plantProgress(weeklyXp).level;
 }
 
 // ── Care metadata ─────────────────────────────────────────────────────────
@@ -181,39 +188,41 @@ export function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-// ── Leagues (Duolingo-style, ranked by XP earned this week) ─────────────────
-export interface League {
-  key: string;
+// ── Leaderboards (rivals) ──────────────────────────────────────────────────
+// Two side boards. The streak board ranks people by their daily streak; the
+// plant board ranks individual companions by the level they've reached this
+// week. Both are seeded with fixed rival players so a new gardener starts near
+// the bottom and can climb past them with consistent care.
+
+/** A rival on the streak board. Streaks are fixed and high so you start last. */
+export interface RivalStreak {
+  id: string;
   name: string;
-  /** Minimum weekly XP to sit in this league. */
-  min: number;
-  /** Tailwind text + background classes for the league badge. */
-  text: string;
-  badge: string;
+  streak: number;
 }
 
-export const LEAGUES: League[] = [
-  { key: 'bronze', name: 'Bronze', min: 0, text: 'text-amber-700', badge: 'bg-amber-100 text-amber-800' },
-  { key: 'silver', name: 'Silver', min: 60, text: 'text-slate-600', badge: 'bg-slate-200 text-slate-700' },
-  { key: 'gold', name: 'Gold', min: 150, text: 'text-yellow-600', badge: 'bg-yellow-100 text-yellow-800' },
-  { key: 'sapphire', name: 'Sapphire', min: 300, text: 'text-blue-600', badge: 'bg-blue-100 text-blue-800' },
-  { key: 'ruby', name: 'Ruby', min: 500, text: 'text-rose-600', badge: 'bg-rose-100 text-rose-800' },
-  { key: 'emerald', name: 'Emerald', min: 800, text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-800' },
-  { key: 'diamond', name: 'Diamond', min: 1200, text: 'text-cyan-600', badge: 'bg-cyan-100 text-cyan-800' },
+export const FAKE_STREAK_PLAYERS: RivalStreak[] = [
+  { id: 'rival-parth', name: 'Parth.P', streak: 47 },
+  { id: 'rival-ishaan', name: 'Ishaan.D', streak: 33 },
+  { id: 'rival-arnav', name: 'Arnav.M', streak: 21 },
+  { id: 'rival-jeevithan', name: 'Jeevithan', streak: 12 },
 ];
 
-/** The league a given weekly-XP total currently sits in. */
-export function leagueForXp(weeklyXp: number): League {
-  let league = LEAGUES[0];
-  for (const l of LEAGUES) if (weeklyXp >= l.min) league = l;
-  return league;
+/** A rival companion on the weekly plant-level board. Beatable in a diligent week. */
+export interface RivalPlant {
+  id: string;
+  owner: string;
+  name: string;
+  kind: Kind;
+  level: number;
 }
 
-/** The next league up, or null if already at the top. */
-export function nextLeague(current: League): League | null {
-  const i = LEAGUES.findIndex((l) => l.key === current.key);
-  return i >= 0 && i < LEAGUES.length - 1 ? LEAGUES[i + 1] : null;
-}
+export const FAKE_PLANT_PLAYERS: RivalPlant[] = [
+  { id: 'rplant-parth', owner: 'Parth.P', name: 'Monstera', kind: 'plant', level: 13 },
+  { id: 'rplant-ishaan', owner: 'Ishaan.D', name: 'Biscuit', kind: 'pet', level: 10 },
+  { id: 'rplant-arnav', owner: 'Arnav.M', name: 'Fiddle Fig', kind: 'plant', level: 7 },
+  { id: 'rplant-jeevithan', owner: 'Jeevithan', name: 'Aloe', kind: 'plant', level: 4 },
+];
 
 // ── Streak & week helpers ───────────────────────────────────────────────────
 /** Local YYYY-MM-DD key for a date. */
@@ -311,7 +320,7 @@ export function dailyCareNeeds(plant: PlantVM, now: number = Date.now()): CareNe
 // ── Weekly photo health check ───────────────────────────────────────────────
 /**
  * A photo health check is due once per week (Monday-started, matching the
- * league week). Until one is taken, the companion's health is treated as
+ * weekly level reset). Until one is taken, the companion's health is treated as
  * unknown and the user is nudged to snap a fresh photo.
  */
 export function healthCheckDue(plant: PlantVM, now: Date = new Date()): boolean {

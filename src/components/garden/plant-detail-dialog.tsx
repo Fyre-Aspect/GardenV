@@ -23,7 +23,9 @@ import {
   dailyCareNeeds,
   formatCooldown,
   healthCheckDue,
+  HEALTHY_LEVEL_MIN,
   MINIGAME_CARE,
+  plantProgress,
   STATUS_META,
   type CareType,
   type PlantVM,
@@ -74,6 +76,8 @@ export function PlantDetailDialog({
   const isPet = kind === 'pet';
   const checkDue = healthCheckDue(live);
   const needs = dailyCareNeeds(live, now);
+  const lvl = plantProgress(live.weeklyXp ?? 0);
+  const canLevel = live.healthScore >= HEALTHY_LEVEL_MIN;
 
   function doCare(type: CareType) {
     // Water and feeding are skill mini-games; anything else is an instant tap.
@@ -172,6 +176,22 @@ export function PlantDetailDialog({
               )}
             </div>
 
+            {/* ── LEVEL (per-plant, resets weekly) ── */}
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-sm">
+                <span className="font-bold text-foreground">Level {lvl.level} this week</span>
+                <span className="text-muted-foreground">
+                  {lvl.xpIntoLevel}/{lvl.xpForNext} XP
+                </span>
+              </div>
+              <ProgressBar value={(lvl.xpIntoLevel / lvl.xpForNext) * 100} className="bg-reward" />
+              {!canLevel && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Below 90% health, care keeps your streak but won&apos;t level up until it recovers.
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-3 gap-2">
               <CareFact label="Water" value={`${live.wateringIntervalDays}d`} />
               <CareFact label="Feed" value={`${live.fertilizingIntervalDays}d`} />
@@ -233,8 +253,8 @@ export function PlantDetailDialog({
               })}
             </div>
             <p className="text-center text-xs text-muted-foreground">
-              Caring earns XP and keeps your streak, it&apos;s your progress, not a
-              health score. Health only changes from the weekly photo check.
+              Caring keeps your streak and levels up this plant while it&apos;s healthy
+              (≥90%). Health only changes from the weekly photo check.
             </p>
 
             <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
