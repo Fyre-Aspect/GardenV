@@ -1,32 +1,31 @@
 # Kindred
 
-A gamified plant and pet companion app — track care, scan for AI health checks, climb leaderboards, and keep your streak alive.
+Basically a gamified duolingo style plant and pet companion app. This will track by scanning for AI health checks, climb the global leaderboards and keep your streak alive.
 
 ---
 
 ## The Story Behind It
 
-At my first hackathon I walked in with an idea: a garden sensor that monitors plant health and keeps your plants safe. WE scratched my idea and went for something safe and guess what! The original idea went on to **win first place** with another team.
+At my first hackathon I walked in with an idea: a garden sensor that monitors plant health and keeps your plants safe. WE scratched my idea and went for something safe and guess what! The original idea went on to **win first place** with another team this was heartbreaking cuz i was there I was in that same process however it just did not happen (Hack the valley).
 
-I knew I could build it better. So I did. Kindred is that idea, rebuilt from scratch with everything I wanted it to be: real AI-powered plant and pet identification, a full gamification loop with XP, levels, streaks, and leaderboards, and a polished PWA that works offline on any device.
+I knew I could build it better. So I did. Kindred is that idea, rebuilt from scratch with everything I wanted it to be: real AI-powered plant and pet identification, a full gamification loop with levels, streaks, and leaderboards, and a polished PWA that works offline on any device.
+
+Looks much better too: ![alt text](image-1.png)
 
 ---
 
 ## What It Does
 
-- **Add companions** — plants or pets — by typing a name or scanning a photo
+- **Add companions** You can add plants or pets and give accurate description nad proper breed or scan using ur camera and scan it. 
 - **AI health scans** — point your camera at a plant or pet; Gemini 2.5 Flash identifies the species, scores its health (0–100), flags issues, and returns personalised care tips
-- **Daily care tracking** — water, fertilise, feed, and light reminders with exact amounts and 6-hour cooldowns to prevent over-caring
-- **Weekly photo health checks** — health is judged from real photos, not just taps. Each week you get a nudge to snap a fresh picture
-- **XP and levelling** — every care action earns XP for that companion. Companions only level up when their health is ≥ 90 %, so neglected plants don't cheat the system. Levels reset every Monday for a fresh race
-- **Streaks** — care for any companion each day to extend your streak. Milestone celebrations at 3, 7, 14, 30, 50, 100, and 365 days
-- **Leaderboards** — a weekly plant-level board and a streak board, seeded with rivals you can actually beat with consistent care
-- **Push notifications** — opt-in weekly reminders for health checks via the Web Notifications API
+- **Daily care tracking** By giving daily and important reminders throughout the day and week it ensures that you can optimize your plant health to it's maximum. ![alt text](image.png) ![alt text](image-3.png)
+- **Weekly photo health checks** health is judged from real photos, not just taps. Each week you get a nudge to snap a fresh picture ![alt text](image-2.png)
+- **Push notifications** Imported a web notification API to send notifications throughout the day to ensure that you are on top of things. 
 - **Fully offline-capable** — Firestore's IndexedDB persistent cache means the app keeps working without a connection
 
 ---
 
-## Architecture
+## Architecture (Created by AI!!)
 
 ```
 src/
@@ -47,11 +46,11 @@ src/
     └── plant-ai.ts           # Client-side wrappers for the scan/identify API routes
 ```
 
-The Gemini API key never touches the browser — all AI calls go through Next.js API routes so the key stays server-side.
+For security tright the gemini API key is embedded well within the safe ENVs to ensure this is a safe app.
 
 ---
 
-## Tech Stack
+## Tech Stack (Assisted By AI!!)
 
 | Layer | Technology |
 |---|---|
@@ -67,7 +66,7 @@ The Gemini API key never touches the browser — all AI calls go through Next.js
 
 ---
 
-## AI Used
+## AI Used (Where and how)
 
 **Google Gemini 2.5 Flash** powers two features:
 
@@ -78,13 +77,13 @@ Structured output (response schema) is used for both so the JSON shape is always
 
 ### Claude AI in development
 
-**Claude Opus 4.8** researched the 3D plant model (the `.glb` scene, animation rigging, and how to integrate Three.js + React Three Fiber into Next.js 14 App Router) and explored how to wire it up without blocking hydration or triggering SSR issues.
+**Claude Opus 4.8** researched the 3D plant model (the `.glb` scene, animation rigging, and how to integrate Three.js + React Three Fiber into Next.js 14 App Router) and explored how to wire it up without blocking hydration or triggering SSR issues. Furthermore to give distinct prompt was done by me and the agent was working on implementing my changes.
 
-**Claude Sonnet 4.6** handled architecture organisation — structuring the App Router layout, the Firestore sync model, per-plant XP/levelling logic, the leaderboard redesign, PWA service worker configuration, and E2E test setup with Playwright — ensuring the technical implementation followed through on the product plan while the product direction stayed with the maintainer.
+**Claude Sonnet 4.6** handled architecture organisation — structuring the App Router layout, the Firestore sync model, per-plant XP/levelling logic, the leaderboard redesign, PWA service worker configuration, and E2E test setup with Playwright — ensuring the technical implementation followed through on the product plan while the product direction stayed with the maintainer. Also carried out basic formatting of code and basic fixes that I did not know how to fix myself.
 
 ---
 
-## Running It Yourself
+## Running It Yourself (Pre-Created by Copilot)
 
 ### Prerequisites
 

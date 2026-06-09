@@ -1,11 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- rounded square background, Kindred green -->
   <rect width="100" height="100" rx="22" fill="#2d5a27"/>
-  <!-- leaf body: organic oval with a pointed tip at top -->
-  <path d="M50 84 C34 74 16 57 16 38 C16 20 31 11 50 11 C69 11 84 20 84 38 C84 57 66 74 50 84Z" fill="white"/>
-  <!-- center vein -->
-  <path d="M50 84 C51 68 49 50 53 16" stroke="#2d5a27" stroke-width="4.5" fill="none" stroke-linecap="round"/>
-  <!-- two subtle side veins -->
-  <path d="M51 55 C44 50 32 48 24 42" stroke="#2d5a27" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.6"/>
-  <path d="M52 40 C45 35 33 33 25 28" stroke="#2d5a27" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+  <!-- stem -->
+  <line x1="50" y1="82" x2="50" y2="52" stroke="#a8d5a2" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- left leaf -->
+  <path d="M50 70 C46 61 28 57 20 48 C20 35 35 31 46 42 C48.5 46 49.5 58 50 70Z" fill="#7bc87a"/>
+  <!-- right leaf -->
+  <path d="M50 58 C54 49 72 45 80 36 C80 23 65 19 54 30 C51.5 34 50.5 46 50 58Z" fill="#56ab56"/>
 </svg>
