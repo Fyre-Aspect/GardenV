@@ -48,3 +48,5 @@ firestore-debug.log*
 /public/workbox-*.js.map
 /public/swe-worker-*.js
 /public/fallback-*.js
+
+.vercel
