@@ -1,12 +1,12 @@
 # Kindred
 
-Basically a gamified duolingo style plant and pet companion app. This will track by scanning for AI health checks, climb the global leaderboards and keep your streak alive.
+Basically a gamified duolingo style plant and pet companion app. This will track by scanning for AI health checks, and you have to climb the global leaderboards and keep your streak alive.
 
 ---
 
 ## The Story Behind It
 
-At my first hackathon I walked in with an idea: a garden sensor that monitors plant health and keeps your plants safe. WE scratched my idea and went for something safe and guess what! The original idea went on to **win first place** with another team this was heartbreaking cuz i was there I was in that same process however it just did not happen (Hack the valley).
+So basically At my first hackathon I walked in with an idea: a garden sensor that monitors plant health and keeps your plants safe. WE scratched my idea and went for something safe and guess what! The original idea that i had went on to **win first place** this was heartbreaking cuz i was there I was in that same process however it just did not happen (Hack the valley).
 
 I knew I could build it better. So I did. Kindred is that idea, rebuilt from scratch with everything I wanted it to be: real AI-powered plant and pet identification, a full gamification loop with levels, streaks, and leaderboards, and a polished PWA that works offline on any device.
 
@@ -23,67 +23,21 @@ Looks much better too: ![alt text](image-1.png)
 - **Push notifications** Imported a web notification API to send notifications throughout the day to ensure that you are on top of things. 
 - **Fully offline-capable** Firestore's IndexedDB persistent cache means the app keeps working without a connection
 
----
-
-## Architecture (Created by AI!!) Like for this read me I mean
-
-```
-src/
-├── app/
-│   ├── page.tsx              # Landing / auth gate
-│   ├── garden/page.tsx       # Main dashboard (auth-protected)
-│   └── api/
-│       ├── scan/route.ts     # Server-side Gemini image scan
-│       └── identify/route.ts # Server-side Gemini text identification
-├── components/
-│   ├── garden/               # All garden UI (plant cards, leaderboards, dialogs, mini-games)
-│   ├── garden-provider.tsx   # Firestore sync + local state (plants, streak, XP)
-│   ├── auth-provider.tsx     # Firebase Auth context
-│   └── plant-3d.tsx          # Three.js 3D plant on the landing page
-└── lib/
-    ├── firebase.ts           # Firebase init (persistent Firestore cache for offline)
-    ├── data.ts               # View models, XP/level logic, care scheduling, leaderboard seeds
-    └── plant-ai.ts           # Client-side wrappers for the scan/identify API routes
-```
-
-For security tright the gemini API key is embedded well within the safe ENVs to ensure this is a safe app.
-
----
-
-## Tech Stack (Assisted By AI!!) Like for this readme I mean
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 14 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS + Radix UI primitives |
-| Animation | Framer Motion |
-| 3D | Three.js + React Three Fiber / Drei |
-| Backend / Auth | Firebase (Firestore + Google Auth + Analytics) |
-| AI | Google Gemini 2.5 Flash via `@google/genai` |
-| PWA | `@ducanh2912/next-pwa` (service worker + offline cache) |
-| Testing | Playwright (E2E) |
-
----
-
 ## AI Used (Where and how)
 
-**Google Gemini 2.5 Flash** powers two features:
+**Google Gemini 2.5 Flash using google AI studio API key** powers two features:
 
-1. **Photo scan** (`/api/scan`)  you upload a photo; Gemini identifies the plant or pet, scores its health, lists visible issues, and returns watering/fertilising intervals and care tips as structured JSON
-2. **Text identification** (`/api/identify`)  when you type a name instead of scanning, Gemini infers species and care needs, and flags when it's too vague and a photo would help
-
-Structured output (response schema) is used for both so the JSON shape is always guaranteed and never needs post-processing.
+1. **Photo scan** (`/api/scan`)  you upload a photo and then Gemini identifies the plant or pet, scores its health, lists visible issues, and returns watering/fertilising intervals and care tips as mentionsed within the JSON
+2. **Text identification** (`/api/identify`)  when you type a name instead of scanning, Gemini infers species and care needs from open source net, and flags when it's too vague which in return asks for the user to take a picture of the plant regardless of agnle or what not.
 
 ### Claude AI in development
 
-**Claude Opus 4.8** researched the 3D plant model (the `.glb` scene, animation rigging, and how to integrate Three.js + React Three Fiber into Next.js 14 App Router) and explored how to wire it up without blocking hydration or triggering SSR issues. Furthermore to give distinct prompt was done by me and the agent was working on implementing my changes.
+**Claude Opus 4.8** researched the 3D plant model (the `.glb` scene, animation rigging, and how to integrate Three.js + React Three Fiber into Next.js 14 App Router) and explored how to wire it up without blocking hydration or triggering SSR issues.
 
-**Claude Sonnet 4.6** handled architecture organisation  structuring the App Router layout, the Firestore sync model, per-plant XP/levelling logic, the leaderboard redesign, PWA service worker configuration, and E2E test setup with Playwright  ensuring the technical implementation followed through on the product plan while the product direction stayed with the maintainer. Also carried out basic formatting of code and basic fixes that I did not know how to fix myself. I also do want to adress when I was lazy I asked it to complete all hard tasks for it to complete but I am pretty sure the Idea, creativity, prompts and some coding was written by me and AI was just there for execution for integrations and hard thigns I cannot figure out. 
+**Claude Sonnet 4.6** handled architecture organization,  this meant to structure tha basic app layout and ensure that my PWA optimization was correct it also helped with tracking user data correctly on Firebase and the leaderboard redesign, PWA service worker configuration, and E2E test setup with Playwright. I also do want to adress when I was lazy I asked it to complete all hard tasks for it to complete but I am sure the Idea, creativity, prompts and coding was written by me while AI was just there for execution and  integrations and hard thigns I cannot figure out. 
 
----
 
-## Running It Yourself (Pre-Created by Copilot)
+You can try it out yourself on teh deployment but if not you can follow steps below to set up the repo on your own.
 
 ### Prerequisites
 
@@ -93,18 +47,12 @@ Structured output (response schema) is used for both so the JSON shape is always
 
 ### 1. Clone
 
-```bash
-git clone https://github.com/Fyre-Aspect/GardenV.git
-cd GardenV
-npm install
-```
-
 ### 2. Environment variables
 
-Create a `.env.local` file in the project root:
+Create a `.env.local` file in the main housing of the files like the root of structrure.
 
 ```env
-# Firebase (safe to expose to the browser  access is controlled by security rules)
+# Firebase
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=
@@ -112,36 +60,16 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
-
-# Gemini  server-side only, never sent to the browser
 GEMINI_API_KEY=
 ```
 
 ### 3. Firebase setup
-
 - Enable **Google sign-in** in Firebase Auth
 - Create a **Firestore** database
-- Deploy security rules: `firebase deploy --only firestore:rules`
 
 ### 4. Run locally
 
 ```bash
 npm run dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-### 5. Build and run as a PWA
-
-```bash
-npm run build
-npm start
-```
-
-Visit the site and use your browser's "Add to Home Screen" / "Install app" prompt to install it as a PWA.
-
----
-
-## License
-
-MIT
+There you have it the repo and eveyrthing and for PWA on the local host you can install it by clicking settsin and add to home page nad you will see an install button and what not.
